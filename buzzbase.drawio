@@ -404,7 +404,7 @@
                         <mxRectangle width="43" height="30" as="alternateBounds"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="147" value="pitching_record_id (integer)" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;fillColor=none;top=0;left=0;bottom=0;right=0;align=left;spacingLeft=6;overflow=hidden;" vertex="1" parent="145">
+                <mxCell id="147" value="pitching_result_id (integer)" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;fillColor=none;top=0;left=0;bottom=0;right=0;align=left;spacingLeft=6;overflow=hidden;" vertex="1" parent="145">
                     <mxGeometry x="43" width="187" height="30" as="geometry">
                         <mxRectangle width="187" height="30" as="alternateBounds"/>
                     </mxGeometry>
