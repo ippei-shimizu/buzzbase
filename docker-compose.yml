@@ -1,0 +1,38 @@
+version: "3"
+services:
+  db:
+    image: postgres:15.5
+    environment:
+      POSTGRES_DB: app_development
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+  back:
+    build:
+      context: ./back
+      dockerfile: Dockerfile
+    command: bash -c "rm -f tmp/pids/server.pid && bundle exec rails s -b '0.0.0.0'"
+    volumes:
+      - ./back:/app
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    tty: true
+    stdin_open: true
+    environment:
+      - RAILS_ENV=development
+  front:
+    build:
+      context: ./front/
+      dockerfile: Dockerfile
+    volumes:
+      - ./front:/app
+    command: yarn dev -p 4000
+    ports:
+      - "8000:4000"
+volumes:
+  postgres_data:
