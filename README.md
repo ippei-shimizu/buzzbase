@@ -4,7 +4,7 @@
 Figma https://www.figma.com/file/zwyB9tqtr1JrFWsStPnk91/BuzzBase?type=design&node-id=0%3A1&mode=design&t=jMRCRPuenaHnDUAJ-1
 
 ### ER図
-[![Image from Gyazo](https://i.gyazo.com/86e4a282f575a22e847c19bdb0eb1ed1.png)](https://gyazo.com/86e4a282f575a22e847c19bdb0eb1ed1)
+[![Image from Gyazo](https://i.gyazo.com/3a036416483bcb92cef9a6c632a760bf.png)](https://gyazo.com/3a036416483bcb92cef9a6c632a760bf)
 
 ### READMEに記載した機能
 - [x] 会員登録機能
