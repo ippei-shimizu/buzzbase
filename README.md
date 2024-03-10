@@ -105,7 +105,7 @@ Password : password
 | 環境構築 | Docker |
 | CI/CD | Github Actions |
 | インフラ | Vercel / Heroku / S3 |
-| その他 | SWR / Tailwind CSS / NextUI / Mantine / js-cookie / ESLint / rubocop / CarrierWave / mini magick / letter opener web |
+| その他 | SWR / Tailwind CSS / NextUI / Mantine / js-cookie / <br> ESLint / rubocop / CarrierWave / mini magick / letter opener web |
 
 ## インフラ構成図
 
