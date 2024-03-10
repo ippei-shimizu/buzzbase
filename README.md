@@ -3,10 +3,11 @@
 ![](/assets/buzz-ogp.png)
 
 ### 野球の個人成績をランキング形式で共有できるアプリ
+
 サービス URL : https://buzzbase.jp/  
 ゲストユーザーアカウント情報  
 Email : buzzbase.app+1@gmail.com  
-Password : password  
+Password : password
 
 ユーザーは野球の試合結果と個人成績を記録して管理することができます。  
 そして、フォローしているユーザー同士でグループを作成することができ、グループ内で個人成績をランキング形式で比較・共有することができます。  
@@ -28,14 +29,12 @@ Password : password
 ### 試合結果・個人打撃・個人投手成績を記録録機能
 
 ![](/assets/record.png)
-1試合ごとに「試合結果」と「個人成績」を記録することができます。  
-記録できる項目は以下になります。
 
-| 試合記録項目 | 操作画面 |
-| ---- | ---- |
-| ・試合日付 <br> ・試合種類（公式戦/オープン戦） <br> ・大会名 <br> ・自分チーム名 <br> ・相手チーム名 <br> ・点数 <br> ・打順 <br> ・ 守備位置 <br> ・メモ | [![Image from Gyazo](https://i.gyazo.com/4b3992d3b6493fc02389d9169bcc2eeb.gif)](https://gyazo.com/4b3992d3b6493fc02389d9169bcc2eeb)|
+| 試合結果を記録                                                                                                                                   | 打撃成績を記録 |
+| :----------------------------------------------------------------------------------------------------------------------------------------------------------: | :---: |
+| <img src="https://i.gyazo.com/4b3992d3b6493fc02389d9169bcc2eeb.gif" width="260">                                                                              | <img src="https://i.gyazo.com/e0d4423d89b82717e18b94de9621570f.gif" width="270">    |
+| <p style="text-align:left;">・試合日付 <br> ・試合種類（公式戦/オープン戦） <br> ・大会名 <br> ・自分チーム名 <br> ・相手チーム名 <br> ・点数 <br> ・打順 <br> ・ 守備位置 <br> ・メモ</p> | <p style="text-align:left;">・打席ごとの結果 <br> ・打点 <br> ・得点 <br> ・失策 <br> ・盗塁 <br> ・盗塁死</p> |
 
-
+1 試合ごとに「試合結果」と「個人成績」を記録することができます。
 
 [開発開始時の README はこちら](https://github.com/ippei-shimizu/buzzbase_front/blob/main/README.md)
-
