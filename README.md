@@ -45,7 +45,7 @@ Password : password
 
 ### 👬 グループ作成機能
 
-![](/assets/group.png)
+![](/assets/group-v2.png)
 
 | グループ作成 | メンバー追加 |
 | :---: | :---: |
@@ -62,7 +62,7 @@ Password : password
 
 ### 👑 個人成績ランキング機能
 
-![](/assets/ranking.png)  
+![](/assets/ranking-v2.png)  
 
 | 打撃成績ランキング | 投手成績ランキング |
 | :---: | :---: |
@@ -95,4 +95,5 @@ Password : password
 | <p align="left">フォロー時とグループ招待時に、通知が届きます。グループへの参加・不参加は、通知画面上で行うようにしました。</p> | 
 
 
+[画面遷移図-figma](https://www.figma.com/file/zwyB9tqtr1JrFWsStPnk91/BuzzBase?type=design&node-id=0-1&mode=design)
 [開発スタート時のREADMEはこちら](https://github.com/ippei-shimizu/buzzbase_front/blob/main/README.md)
