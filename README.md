@@ -71,7 +71,14 @@ Password : password
 
 グループに参加しているメンバー同士で、「打撃成績」「投手成績」をランキング形式で共有することができます。
 
+## その他機能
 
+### 🙍‍♂️ ユーザー機能
+
+| メールアドレス認証 | リアルタイムバリデーション | マイページ |
+| :---: | :---: | :---: |
+| <img src="https://i.gyazo.com/fa66330a8753d85b01f363ce79a86f56.png" width="280"> | <img src="https://i.gyazo.com/9c7e6c199fd75b5b39869da825e001ff.gif" width="280"> | <img src="https://i.gyazo.com/076dd7646bb4ad712302ef0c7a2f9258.gif" width="280"> | 
+| <p align="left">新規会員登録時に「メールアドレス認証」を実装しました。<br> これにより不正なアカウントを作成することなどを防ぎ、セキュリティ面の向上を図りました</p> | <p align="left">リアルタイムバリデーションを導入することで、フォームを送信する前に入力ミスをユーザーに伝えることができ、UXの向上を図りました。</p> | <p align="left">マイページで「ポジション」「所属チーム」「受賞タイトル」「成績」「試合結果」などの情報を確認することができます。</p>
 
 
 [開発スタート時のREADMEはこちら](https://github.com/ippei-shimizu/buzzbase_front/blob/main/README.md)
