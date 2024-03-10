@@ -80,5 +80,12 @@ Password : password
 | <img src="https://i.gyazo.com/fbdbdc65350675f713460b88718cc7f4.gif" width="220"> | <img src="https://i.gyazo.com/9c7e6c199fd75b5b39869da825e001ff.gif" width="220"> | <img src="https://i.gyazo.com/076dd7646bb4ad712302ef0c7a2f9258.gif" width="220"> | 
 | <p align="left">新規会員登録時に「メールアドレス認証」を実装しました。<br> これにより不正なアカウントを作成することなどを防ぎ、セキュリティ面の向上を図りました</p> | <p align="left">リアルタイムバリデーションを導入することで、フォームを送信する前に入力ミスをユーザーに伝えることができ、UXの向上を図りました。</p> | <p align="left">マイページで「ポジション」「所属チーム」「受賞タイトル」「成績」「試合結果」などの情報を確認することができます。</p>
 
+### 🙍‍♂️ ユーザー検索機能
+
+| オートコンプリート | 
+| :---: |
+| <img src="https://i.gyazo.com/cd124a2e3739f0d2ed61812215f06bda.gif" width="220"> | 
+| <p align="left">ユーザー検索には、オートコンプリート機能を実装して、１文字ずつ候補を表示させることで、ユーザーの入力する手間を減らし、UXの向上を図りました。</p> | 
+
 
 [開発スタート時のREADMEはこちら](https://github.com/ippei-shimizu/buzzbase_front/blob/main/README.md)
