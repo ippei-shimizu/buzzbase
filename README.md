@@ -44,4 +44,15 @@ Password : password
 
 ### 👬 グループ作成機能
 
+![](/assets/group.png)
+
+| グループ作成 |
+| :---: |
+| <img src="https://i.gyazo.com/b9f4dca471348eb44cfea1100345d9f7.gif" width="320"> | 
+| <p align="left">グループアイコン画像 / グループ名 / グループメンバー招待</p> |
+
+フォローしているユーザーのみに対して、グループメンバーに招待することができます。招待時には「通知」を送信し、ユーザー自身がグループに「参加」or「拒否」を選択することができます。
+
+
+
 [開発スタート時のREADMEはこちら](https://github.com/ippei-shimizu/buzzbase_front/blob/main/README.md)
