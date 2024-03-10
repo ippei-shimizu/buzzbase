@@ -5,7 +5,8 @@
 ### 野球の個人成績をランキング形式で共有できるアプリ
 
 サービスURL : https://buzzbase.jp/  
-ゲストユーザーアカウント情報  
+
+【ゲストユーザーアカウント情報】  
 Email : buzzbase.app+1@gmail.com  
 Password : password
 
@@ -46,10 +47,10 @@ Password : password
 
 ![](/assets/group.png)
 
-| グループ作成 |
-| :---: |
-| <img src="https://i.gyazo.com/b9f4dca471348eb44cfea1100345d9f7.gif" width="320"> | 
-| <p align="left">グループアイコン画像 / グループ名 / グループメンバー招待</p> |
+| グループ作成 | メンバー追加 |
+| :---: | :---: |
+| <img src="https://i.gyazo.com/b9f4dca471348eb44cfea1100345d9f7.gif" width="320"> | <img src="https://i.gyazo.com/4ec6a5612e76622dcc8985479156f391.gif" width="320"> | 
+| <p align="left">グループアイコン画像 / グループ名 / グループメンバー招待</p> | <p align="left">グループ作成後に、新規にユーザーをグループに招待することができます。</p> |
 
 フォローしているユーザーのみに対して、グループメンバーに招待することができます。招待時には「通知」を送信し、ユーザー自身がグループに「参加」or「拒否」を選択することができます。
 
