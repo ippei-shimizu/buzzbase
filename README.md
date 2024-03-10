@@ -35,7 +35,6 @@ Password : password
 | <img src="https://i.gyazo.com/4b3992d3b6493fc02389d9169bcc2eeb.gif" width="320">                                                                              | <img src="https://i.gyazo.com/e0d4423d89b82717e18b94de9621570f.gif" width="320">    |
 | <p align="left">・試合日付 <br> ・試合種類（公式戦/オープン戦） <br> ・大会名 <br> ・自分チーム名 <br> ・相手チーム名 <br> ・点数 <br> ・打順 <br> ・ 守備位置 <br> ・メモ</p> | <p align="left">・打席結果 <br> ・打点 <br> ・得点 <br> ・失策 <br> ・盗塁 <br> ・盗塁死</p> |
 | 投手を記録                                                                                                                                   | 成績まとめ |
-| :----------------------------------------------------------------------------------------------------------------------------------------------------------: | :---: |
 | <img src="https://i.gyazo.com/3d8031261e0e2e9d1fafd3b2c13134ae.gif" width="320">                                                                              | <img src="https://i.gyazo.com/d9eb11c5bbb7504d06387cb63942e253.gif" width="320">    |
 | <p align="left">・勝敗 <br> ・投球回数 <br> ・投球数 <br> ・完投 <br> ・ホールド <br> ・セーブ <br> ・失点 <br> ・自責点 <br> ・被安打 <br> ・被本塁打 <br> ・奪三振 <br> ・四球 <br> ・死球</p> | <p align="left">「試合結果」「打席成績」「投手成績」をまとめて確認することができます。</p> |
 
