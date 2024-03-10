@@ -94,6 +94,18 @@ Password : password
 | <img src="https://i.gyazo.com/99c16d2c933c658cc02d3b05d2b8f1a5.gif" width="220"> | 
 | <p align="left">フォロー時とグループ招待時に、通知が届きます。グループへの参加・不参加は、通知画面上で行うようにしました。</p> | 
 
+## 使用技術
+
+| カテゴリ | 技術 | 
+| --- | --- |
+| フロントエンド | TypeScript 5.3.2 / React 18.2.0 / Next.js 14.0.3 | 
+| バックエンド | Ruby 3.2.2 / Ruby on Rails 7.0.8（APIモード） |
+| データベース | PostgreSQL 15.5 |
+| 認証 | devise toke auth 1.2.2 |
+| 環境構築 | Docker |
+| CI/CD | Github Actions |
+| インフラ | Vercel / Heroku / S3 |
+| その他 | SWR / Tailwind CSS / NextUI / Mantine / js-cookie / ESLint / rubocop / CarrierWave / mini magick / letter opener web |
 
 [画面遷移図-figma](https://www.figma.com/file/zwyB9tqtr1JrFWsStPnk91/BuzzBase?type=design&node-id=0-1&mode=design)
 [開発スタート時のREADMEはこちら](https://github.com/ippei-shimizu/buzzbase_front/blob/main/README.md)
