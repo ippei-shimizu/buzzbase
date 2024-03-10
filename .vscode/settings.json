@@ -2,5 +2,11 @@
   "typescript.preferences.importModuleSpecifier": "non-relative",
   "editor.quickSuggestions": {
     "strings": true
+  },
+  "editor.wordWrap": "bounded",
+  "editor.wordWrapColumn": 200,
+  "[markdown]": {
+    "editor.defaultFormatter": false,
+    "editor.wordWrap": "bounded"
   }
 }
