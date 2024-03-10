@@ -107,5 +107,15 @@ Password : password
 | インフラ | Vercel / Heroku / S3 |
 | その他 | SWR / Tailwind CSS / NextUI / Mantine / js-cookie / ESLint / rubocop / CarrierWave / mini magick / letter opener web |
 
+## インフラ構成図
+
+![](/assets/infrastructure-configuration-chart.png)
+
+## ER図
+
+[![Image from Gyazo](https://i.gyazo.com/3a036416483bcb92cef9a6c632a760bf.png)](https://gyazo.com/3a036416483bcb92cef9a6c632a760bf)
+
+
+
 [画面遷移図-figma](https://www.figma.com/file/zwyB9tqtr1JrFWsStPnk91/BuzzBase?type=design&node-id=0-1&mode=design)
 [開発スタート時のREADMEはこちら](https://github.com/ippei-shimizu/buzzbase_front/blob/main/README.md)
