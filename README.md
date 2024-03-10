@@ -115,6 +115,8 @@ Password : password
 
 [![Image from Gyazo](https://i.gyazo.com/3a036416483bcb92cef9a6c632a760bf.png)](https://gyazo.com/3a036416483bcb92cef9a6c632a760bf)
 
+[テーブル設計詳細]()
+
 ## 今後の開発について（本リリース）
 
 今後、以下の機能を実装予定です。
