@@ -115,7 +115,7 @@ Password : password
 
 [![Image from Gyazo](https://i.gyazo.com/3a036416483bcb92cef9a6c632a760bf.png)](https://gyazo.com/3a036416483bcb92cef9a6c632a760bf)
 
-[テーブル設計詳細]()
+[テーブル設計詳細](https://github.com/ippei-shimizu/buzzbase/blob/main/buzz-base-table.md)
 
 ## 今後の開発について（本リリース）
 
