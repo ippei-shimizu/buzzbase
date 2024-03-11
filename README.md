@@ -7,8 +7,17 @@
 サービスURL : https://buzzbase.jp/  
 
 【ゲストユーザーアカウント情報】  
+・ゲストユーザー1  
 Email : buzzbase.app+1@gmail.com  
-Password : password
+Password : password  
+
+・ゲストユーザー2  
+Email : buzzbase.app+2@gmail.com  
+Password : password     
+
+・ゲストユーザー3  
+Email : buzzbase.app+3@gmail.com  
+Password : password    
 
 ユーザーは野球の試合結果と個人成績を記録して管理することができます。  
 そして、フォローしているユーザー同士でグループを作成することができ、グループ内で個人成績をランキング形式で比較・共有することができます。  
@@ -107,6 +116,8 @@ Password : password
 | インフラ | Vercel / Heroku / S3 |
 | その他 | SWR / Tailwind CSS / NextUI / Mantine / js-cookie / <br> ESLint / rubocop / CarrierWave / mini magick / letter opener web |
 
+### 🧑‍💻 技術選定理由
+
 ## インフラ構成図
 
 ![](/assets/infrastructure-configuration-chart.png)
@@ -116,6 +127,8 @@ Password : password
 [![Image from Gyazo](https://i.gyazo.com/3a036416483bcb92cef9a6c632a760bf.png)](https://gyazo.com/3a036416483bcb92cef9a6c632a760bf)
 
 [テーブル設計詳細](https://github.com/ippei-shimizu/buzzbase/blob/main/buzz-base-table.md)
+
+## こだわりポイント
 
 ## 今後の開発について（本リリース）
 
