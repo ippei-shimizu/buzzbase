@@ -1,10 +1,9 @@
-# BUZZ BASE
+# BUZZ BASE  
+サービスURL : https://buzzbase.jp/  
 
 ![](/assets/buzz-ogp.png)
 
 ### 野球の個人成績をランキング形式で共有できるアプリ
-
-サービスURL : https://buzzbase.jp/  
 
 【ゲストユーザーアカウント情報】  
 ・ゲストユーザー1  
