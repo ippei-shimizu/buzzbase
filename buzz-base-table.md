@@ -1,6 +1,6 @@
 # BUZZ BASE テーブルについて
 
-[![Image from Gyazo](https://i.gyazo.com/3a036416483bcb92cef9a6c632a760bf.png)](https://gyazo.com/3a036416483bcb92cef9a6c632a760bf)
+[![Image from Gyazo](https://i.gyazo.com/675a5d6a117b37be94c45cece4db3970.png)](https://gyazo.com/675a5d6a117b37be94c45cece4db3970)
 
 ## usersテーブル
 | カラム | 型 | 詳細 |
