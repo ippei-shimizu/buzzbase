@@ -155,7 +155,7 @@ SWRは、成績データなど頻繁に更新が必要な情報を効率的に�
 
 ## ER図
 
-[![Image from Gyazo](https://i.gyazo.com/3a036416483bcb92cef9a6c632a760bf.png)](https://gyazo.com/3a036416483bcb92cef9a6c632a760bf)
+[![Image from Gyazo](https://i.gyazo.com/675a5d6a117b37be94c45cece4db3970.png)](https://gyazo.com/675a5d6a117b37be94c45cece4db3970)
 
 [テーブル設計詳細](https://github.com/ippei-shimizu/buzzbase/blob/main/buzz-base-table.md)
 
