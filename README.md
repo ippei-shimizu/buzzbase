@@ -35,7 +35,7 @@ Password : password
 - グループ作成機能
 - 個人成績ランキング機能
 
-### 📝 試合結果・個人打撃・個人投手成績を記録録機能
+### 📝 試合結果・個人打撃・個人投手成績を記録機能
 
 ![](/assets/record.png)
 
@@ -106,13 +106,13 @@ Password : password
 
 | カテゴリ | 技術 | 
 | --- | --- |
-| フロントエンド | TypeScript 5.3.2 / React 18.2.0 / Next.js 14.0.3 | 
+| フロントエンド | Next.js 14.0.3 / React 18.2.0  / TypeScript 5.3.2 | 
 | バックエンド | Ruby 3.2.2 / Ruby on Rails 7.0.8（APIモード） |
 | データベース | PostgreSQL 15.5 |
 | 認証 | devise toke auth 1.2.2 |
 | 環境構築 | Docker |
 | CI/CD | Github Actions |
-| インフラ | Vercel / Heroku / S3 |
+| インフラ | Vercel / Heroku / Amazon S3 |
 | その他 | SWR / Tailwind CSS / NextUI / Mantine / js-cookie / <br> ESLint / rubocop / CarrierWave / mini magick / letter opener web |
 
 ### 🧑‍💻 技術選定理由 
