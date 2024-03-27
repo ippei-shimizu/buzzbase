@@ -118,7 +118,7 @@ Password : password
 | フロントエンド | Next.js 14.0.3 / React 18.2.0  / TypeScript 5.3.2 | 
 | バックエンド | Ruby 3.2.2 / Ruby on Rails 7.0.8（APIモード） |
 | データベース | PostgreSQL 15.5 |
-| 認証 | devise toke auth 1.2.2 |
+| 認証 | devise token auth 1.2.2 |
 | 環境構築 | Docker |
 | CI/CD | Github Actions |
 | インフラ | Vercel / Heroku / Amazon S3 |
@@ -214,6 +214,4 @@ SWRは、成績データなど頻繁に更新が必要な情報を効率的に�
   - ファンユーザーは、選手に対して応援メッセージが送れる。
 - 選手のプロフィールページへのアクセス数ランキング機能
 
-
-[画面遷移図-figma](https://www.figma.com/file/zwyB9tqtr1JrFWsStPnk91/BuzzBase?type=design&node-id=0-1&mode=design)  
 [開発スタート時のREADMEはこちら](https://github.com/ippei-shimizu/buzzbase_front/blob/main/README.md)
