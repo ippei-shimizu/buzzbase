@@ -8,5 +8,6 @@
   "[markdown]": {
     "editor.defaultFormatter": false,
     "editor.wordWrap": "bounded"
-  }
+  },
+  "editor.formatOnSave": true
 }

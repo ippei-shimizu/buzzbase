@@ -20,11 +20,13 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - db
+      db:
+        condition: service_started
     tty: true
     stdin_open: true
     environment:
       - RAILS_ENV=development
+      - PGPASSWORD=password
   front:
     build:
       context: ./front/
