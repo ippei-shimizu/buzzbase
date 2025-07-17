@@ -17,10 +17,6 @@ Password : password
 Email : buzzbase.app+2@gmail.com  
 Password : password     
 
-・ゲストユーザー3  
-Email : buzzbase.app+3@gmail.com  
-Password : password    
-
 ユーザーは野球の試合結果と個人成績を記録して管理することができます。  
 そして、フォローしているユーザー同士でグループを作成することができ、グループ内で個人成績をランキング形式で比較・共有することができます。  
 個人成績を可視化して、他人と比較できることで、競争心や楽しさを感じながらユーザーの野球に対するモチベーション向上をサポートするサービスになります。
