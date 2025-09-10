@@ -9,5 +9,10 @@
     "editor.defaultFormatter": false,
     "editor.wordWrap": "bounded"
   },
-  "editor.formatOnSave": true
+  "editor.formatOnSave": true,
+  "claude.language": "ja",
+  "claude.locale": "ja-JP",
+  "claude.reviewLanguage": "japanese",
+  "claude.commentLanguage": "ja",
+  "claude.outputLanguage": "japanese"
 }
