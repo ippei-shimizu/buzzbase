@@ -1,0 +1,7 @@
+.serena
+
+# Claude Code settings
+.claude/
+
+# Dependencies
+package-lock.json
