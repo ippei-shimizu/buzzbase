@@ -26,6 +26,8 @@ services:
     environment:
       - RAILS_ENV=development
       - PGPASSWORD=password
+      - BUNDLE_PATH=/app/vendor/bundle
+      - JWT_SECRET=ZATdfgMg5Udn7Ozm1qSKQM6qWzDb2wZt2ZqJoXXS08w=
   front:
     build:
       context: ./front/
