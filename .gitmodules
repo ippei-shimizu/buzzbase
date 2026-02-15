@@ -1,6 +1,8 @@
 [submodule "front"]
 	path = front
 	url = git@github.com:ippei-shimizu/buzzbase_front.git
+	ignore = dirty
 [submodule "back"]
 	path = back
 	url = git@github.com:ippei-shimizu/buzzbase_back.git
+	ignore = dirty
