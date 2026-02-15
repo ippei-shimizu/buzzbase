@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
     ports:
-      - "5432:5432"
+      - "5532:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
   back:
@@ -17,7 +17,7 @@ services:
     volumes:
       - ./back:/app
     ports:
-      - "3000:3000"
+      - "3100:3000"
     depends_on:
       db:
         condition: service_started
@@ -30,16 +30,16 @@ services:
       - PGPASSWORD=password
       - BUNDLE_PATH=/app/vendor/bundle
       - JWT_SECRET=ZATdfgMg5Udn7Ozm1qSKQM6qWzDb2wZt2ZqJoXXS08w=
-      - CONFIRM_SUCCESS_URL=http://localhost:8000/signin
-      - FRONTEND_URL=http://localhost:8000
+      - CONFIRM_SUCCESS_URL=http://localhost:8100/signin
+      - FRONTEND_URL=http://localhost:8100
   front:
     build:
       context: ./front/
       dockerfile: Dockerfile
     volumes:
       - ./front:/app
-    command: yarn dev -p 4000
+    command: yarn dev -p 4100
     ports:
-      - "8000:4000"
+      - "8100:4100"
 volumes:
   postgres_data:
