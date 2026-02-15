@@ -1,7 +1,9 @@
 .serena
 
 # Claude Code settings
-.claude/
+.claude/settings.local.json
 
 # Dependencies
 package-lock.json
+
+cookies.txt
