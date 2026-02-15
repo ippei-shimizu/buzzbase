@@ -38,3 +38,4 @@ APIのベースパス: `/api/v1/`
 - フォーマット: `[Type]: [説明]`（例: `Add: 試合結果の絞り込み機能を追加`）
 - Type: `Add`, `Fix`, `Update`, `Change`, `Refactor`, `Remove`, `Test`, `Chore`, `Docs`
 - サブモジュール更新コミット: `Fix: サブプロジェクトのコミットIDを更新`
+- **mainブランチへの直push・直commit・mergeは絶対にしない**（サブモジュールのリポジトリも同様）
