@@ -1,11 +1,11 @@
 ---
 name: pr-description
-description: GitHubのPRのdescriptionを自動生成し、直接PRに反映する。PRのURL、PRの番号、または「PRのdescriptionを作成して」のようなリクエストで起動する。gh CLIでPRの差分・コミット履歴を取得し、テンプレートに沿った日本語のdescriptionを生成して `gh pr edit` で直接更新する。
+description: GitHubのPRのtitleとdescriptionを自動生成し、直接PRに反映する。PRのURL、PRの番号、または「PRのdescriptionを作成して」のようなリクエストで起動する。gh CLIでPRの差分・コミット履歴を取得し、適切なタイトルとテンプレートに沿った日本語のdescriptionを生成して `gh pr edit` で直接更新する。
 ---
 
 # PR Description 作成・反映スキル
 
-GitHub PRのURLまたは番号を受け取り、descriptionを自動生成して直接PRに反映する。
+GitHub PRのURLまたは番号を受け取り、titleとdescriptionを自動生成して直接PRに反映する。
 
 ## ワークフロー
 
@@ -37,7 +37,15 @@ gh pr view <PR_NUMBER_OR_URL> --json commits --jq '.commits[].messageHeadline'
 
 大きなPR（差分が多い場合）はサブエージェントを使って差分を分析する。
 
-### 3. descriptionの生成
+### 3. タイトルの生成
+
+コミット履歴と差分から変更の主目的を要約し、適切なPRタイトルを生成する:
+
+- 70文字以内の簡潔な日本語タイトル
+- 変更内容の「何を」「なぜ」が一目でわかるようにする
+- 既存のタイトルが適切でない場合は改善する
+
+### 4. descriptionの生成
 
 以下のテンプレートに沿ってdescriptionを生成する。差分から読み取れる事実に基づいて各セクションを埋める:
 
@@ -80,18 +88,18 @@ close #ISSUE_NUMBER
 <!-- 補足情報。なければ「特になし」 -->
 ```
 
-### 4. PRへの直接反映
+### 5. PRへの直接反映
 
-生成したdescriptionを `gh pr edit` で直接PRに反映する:
+生成したtitleとdescriptionを `gh pr edit` で直接PRに反映する:
 
 ```bash
-gh pr edit <PR_NUMBER> --body "$(cat <<'EOF'
+gh pr edit <PR_NUMBER> --title "<タイトル>" --body "$(cat <<'EOF'
 <description内容>
 EOF
 )"
 ```
 
-反映後、更新したdescriptionの要約をユーザーに報告する。
+反映後、更新したtitleとdescriptionの要約をユーザーに報告する。
 
 ## 注意事項
 
