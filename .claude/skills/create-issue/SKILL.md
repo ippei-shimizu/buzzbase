@@ -1,7 +1,6 @@
 ---
 name: create-issue
 description: buzzbaseリポジトリ(ippei-shimizu/buzzbase)にGitHub issueを作成し、GitHub Projects "BUZZ BASE"に自動追加する。`/create-issue バグの説明`のように呼び出す。作成前に必ずユーザーに確認を取る。
-disable-model-invocation: true
 ---
 
 # Issue作成スキル
@@ -89,9 +88,68 @@ gh issue create \
   --project "BUZZ BASE"
 ```
 
-### 6. 結果報告
+### 6. ステータスを「Todo」に設定
 
-作成されたissueのURLを表示する。
+issue作成後、GitHub Projects上のステータスを「Todo」に変更する。
+
+```bash
+# 作成されたissueのURLからissue番号を取得
+ISSUE_URL="<作成されたissueのURL>"
+ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -o '[0-9]*$')
+
+# issueのnode IDを取得
+ISSUE_NODE_ID=$(gh issue view "$ISSUE_NUMBER" --repo ippei-shimizu/buzzbase --json id --jq '.id')
+
+# プロジェクトのアイテムIDとStatusフィールド情報を取得し、ステータスを「Todo」に更新
+gh api graphql -f query='
+  query {
+    user(login: "ippei-shimizu") {
+      projectV2(number: 2) {
+        id
+        items(first: 100, orderBy: {field: POSITION, direction: DESC}) {
+          nodes {
+            id
+            content {
+              ... on Issue { id }
+            }
+          }
+        }
+        field(name: "Status") {
+          ... on ProjectV2SingleSelectField {
+            id
+            options { id name }
+          }
+        }
+      }
+    }
+  }
+'
+```
+
+上記クエリの結果から:
+- `content.id` が `ISSUE_NODE_ID` と一致するアイテムの `id` を `ITEM_ID` とする
+- `field.options` から `name` が `"Todo"` のオプションの `id` を `TODO_OPTION_ID` とする
+- `field.id` を `FIELD_ID` とする
+- プロジェクトの `id` を `PROJECT_ID` とする
+
+```bash
+gh api graphql -f query='
+  mutation {
+    updateProjectV2ItemFieldValue(input: {
+      projectId: "<PROJECT_ID>"
+      itemId: "<ITEM_ID>"
+      fieldId: "<FIELD_ID>"
+      value: { singleSelectOptionId: "<TODO_OPTION_ID>" }
+    }) {
+      projectV2Item { id }
+    }
+  }
+'
+```
+
+### 7. 結果報告
+
+作成されたissueのURLとステータスが「Todo」に設定されたことを表示する。
 
 ## 注意事項
 
