@@ -38,7 +38,8 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./front:/app
-    command: yarn dev -p 4100
+      - /app/node_modules
+    command: sh -c "rm -rf /app/.next && yarn dev -p 4100"
     ports:
       - "8100:4100"
 volumes:
