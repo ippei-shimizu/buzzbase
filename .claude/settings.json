@@ -6,6 +6,7 @@
       "Bash(git log *)",
       "Bash(git status)",
       "Bash(git branch *)",
+      "Bash(git push *)",
       "Bash(gh pr view *)",
       "Bash(gh pr diff *)",
       "Bash(cat *)",
