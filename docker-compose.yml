@@ -32,6 +32,7 @@ services:
       - JWT_SECRET=ZATdfgMg5Udn7Ozm1qSKQM6qWzDb2wZt2ZqJoXXS08w=
       - CONFIRM_SUCCESS_URL=http://localhost:8100/signin
       - FRONTEND_URL=http://localhost:8100
+      - SLACK_WEBHOOK_URL=
   front:
     build:
       context: ${FRONT_DIR:-./front}
