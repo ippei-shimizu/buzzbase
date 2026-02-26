@@ -108,7 +108,7 @@ close #ISSUE_NUMBER
 生成したtitleとdescriptionを `gh pr edit` で直接PRに反映する:
 
 ```bash
-gh pr edit <PR_NUMBER> --title "<タイトル>" --body "$(cat <<'EOF'
+gh pr edit <PR_NUMBER> --title "<タイトル>" --add-assignee ippei-shimizu --body "$(cat <<'EOF'
 <description内容>
 EOF
 )"
@@ -118,6 +118,7 @@ EOF
 
 ## 注意事項
 
+- Assigneeは常に `ippei-shimizu` を設定する
 - 日本語で記述する
 - 差分から読み取れる事実に基づいて記述し、推測が入る箇所は明示する
 - issue番号が特定できない場合は `close #` の行は空欄にする（推測で番号を入れない）
