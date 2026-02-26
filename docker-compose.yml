@@ -39,7 +39,7 @@ services:
     volumes:
       - ./front:/app
       - /app/node_modules
-    command: sh -c "rm -rf /app/.next && yarn dev -p 4100"
+    command: sh -c "rm -rf /app/.next && yarn install && yarn dev -p 4100"
     ports:
       - "8100:4100"
 volumes:
