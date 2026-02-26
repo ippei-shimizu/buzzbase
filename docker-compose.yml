@@ -11,11 +11,11 @@ services:
       - postgres_data:/var/lib/postgresql/data
   back:
     build:
-      context: ./back
+      context: ${BACK_DIR:-./back}
       dockerfile: Dockerfile
     command: bash -c "rm -f tmp/pids/server.pid && bundle exec rails s -b '0.0.0.0'"
     volumes:
-      - ./back:/app
+      - ${BACK_DIR:-./back}:/app
     ports:
       - "3100:3000"
     depends_on:
@@ -24,7 +24,7 @@ services:
     tty: true
     stdin_open: true
     env_file:
-      - ./back/.env
+      - ${BACK_DIR:-./back}/.env
     environment:
       - RAILS_ENV=development
       - PGPASSWORD=password
@@ -34,10 +34,10 @@ services:
       - FRONTEND_URL=http://localhost:8100
   front:
     build:
-      context: ./front/
+      context: ${FRONT_DIR:-./front}
       dockerfile: Dockerfile
     volumes:
-      - ./front:/app
+      - ${FRONT_DIR:-./front}:/app
       - /app/node_modules
     command: sh -c "rm -rf /app/.next && yarn install && yarn dev -p 4100"
     ports:
