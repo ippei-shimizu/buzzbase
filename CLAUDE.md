@@ -39,3 +39,6 @@ APIのベースパス: `/api/v1/`
 - Type: `Add`, `Fix`, `Update`, `Change`, `Refactor`, `Remove`, `Test`, `Chore`, `Docs`
 - サブモジュール更新コミット: `Fix: サブプロジェクトのコミットIDを更新`
 - **mainブランチへの直push・直commit・mergeは絶対にしない**（サブモジュールのリポジトリも同様）
+- **ブランチ名に `#` を使用しない**（CI/CDツールとの互換性のため）
+  - OK: `feature/93-private-account`, `feature/issue-93-private-account`
+  - NG: `feature/#93-private-account`
