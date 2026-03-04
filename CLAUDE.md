@@ -21,7 +21,7 @@
 - ブラウザ: `http://localhost:8100`
 - API直接確認: `http://localhost:3100`
 - バックエンドコマンド: `docker compose exec back <command>`（例: `docker compose exec back rails console`）
-- フロントエンドコマンド: `front/` ディレクトリで `yarn dev`, `yarn build`, `yarn lint`, `yarn check`, `yarn test`
+- フロントエンドコマンド: `front/` ディレクトリで `yarn dev`, `yarn build`, `yarn lint`, `yarn typecheck`, `yarn test`
 
 ## サービス間通信
 
