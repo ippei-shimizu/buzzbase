@@ -1,0 +1,469 @@
+# ----------------------------------------
+# レポートのスナップショット
+# アカウント: Ippei Shimizu
+# プロパティ: buzzbase.jp
+# ----------------------------------------
+#  
+# 開始日: 20260101
+# 終了日: 20260314
+アクティブ ユーザー,新規ユーザー数,アクティブ ユーザーあたりの平均エンゲージメント時間,イベント数
+901,876,146.51831298557158,12836
+
+#  
+# 開始日: 20260101
+# 終了日: 20260314
+ページ タイトルとスクリーン クラス,表示回数,アクティブ ユーザー,イベント数,直帰率
+BUZZ BASE | 野球の個人成績をランキング形式で共有できるアプリ - BUZZ BASE 野球の個人成績をランキング形式で共有できるアプリ,2916,486,4713,0.3048780487804878
+試合一覧 - BUZZ BASE,802,104,950,0.16498316498316498
+試合結果まとめ - BUZZ BASE,664,73,740,0.010638297872340425
+ログイン - BUZZ BASE,530,222,985,0.05898876404494382
+打撃成績を記録 - BUZZ BASE,424,71,476,0.012269938650306749
+BUZZ BASE｜野球の個人成績を無料で記録・計算・共有できるアプリ - BUZZ BASE 野球の個人成績をランキング形式で共有できるアプリ,417,241,1070,0.3561643835616438
+投手成績を記録 - BUZZ BASE,406,66,433,0.013605442176870748
+グループ一覧 - BUZZ BASE,356,79,411,0.05223880597014925
+新規会員登録 - BUZZ BASE,312,183,593,0.058823529411764705
+野球ノート - BUZZ BASE,229,79,292,0.075
+ダッシュボード - BUZZ BASE,203,35,256,0.07526881720430108
+ユーザー名・ユーザーID登録 - BUZZ BASE,173,114,270,0.04065040650406504
+野球成績の計算方法＆指標一覧｜打率・防御率・OPSなど全29指標を解説 - BUZZ BASE,157,73,328,0.27472527472527475
+OPS計算ツール｜出塁率・長打率・OPSを生データから一括自動計算 - BUZZ BASE,127,82,363,0.43564356435643564
+成績の算出方法 - BUZZ BASE,110,82,264,0.3627450980392157
+ユーザー検索 - BUZZ BASE,69,37,75,0.041666666666666664
+打率計算ツール｜安打数と打数から打率を自動計算 - BUZZ BASE,65,33,89,0.02040816326530612
+お問い合わせ - BUZZ BASE,50,33,84,0.09090909090909091
+グループ新規作成,32,20,53,0.045454545454545456
+出塁率（OBP）計算ツール｜安打・四球・死球から出塁率を自動計算 - BUZZ BASE,30,17,63,0.3333333333333333
+利用規約 - BUZZ BASE,30,22,38,0.08
+運営からのお知らせ - BUZZ BASE,26,26,41,0.038461538461538464
+長打率（SLG）計算ツール｜塁打数と打数から長打率を自動計算 - BUZZ BASE,25,8,33,0
+ユーザーID未設定による不具合 - BUZZ BASE,24,14,27,0.06666666666666667
+K/BB計算ツール｜奪三振と与四球からK/BBを自動計算 - BUZZ BASE,21,16,61,0.4090909090909091
+防御率（ERA）計算ツール｜自責点と投球回から防御率を自動計算 - BUZZ BASE,20,6,38,0
+プライバシーポリシー - BUZZ BASE,19,8,30,0.07692307692307693
+WHIP計算ツール｜与四球と被安打から WHIPを自動計算 - BUZZ BASE,11,9,23,0.18181818181818182
+シーズン管理 - BUZZ BASE,5,3,6,0
+K/9計算ツール｜奪三振数と投球回からK/9を自動計算 - BUZZ BASE,4,4,9,0.2
+メンバー招待,4,1,8,0
+BB/9計算ツール｜与四球と投球回からBB/9を自動計算 - BUZZ BASE,2,2,5,0.5
+メンバー一覧,1,1,2,0
+
+#  
+# 開始日: 20260101
+# 終了日: 20260314
+ユーザーの最初の参照元 / メディア,アクティブ ユーザー
+google / organic,481
+(direct) / (none),173
+yahoo / organic,152
+bing / organic,20
+runteq.jp / referral,17
+chatgpt.com / (not set),16
+github.com / referral,15
+t.co / referral,14
+service.smt.docomo.ne.jp / referral,5
+qiita.com / referral,4
+jariblog.online / referral,1
+l.instagram.com / referral,1
+mail.yahoo.co.jp / referral,1
+search.fenrir-inc.com / referral,1
+
+#  
+# 開始日: 20260101
+# 終了日: 20260314
+セッションの参照元 / メディア,セッション
+google / organic,811
+(direct) / (none),400
+yahoo / organic,180
+github.com / referral,57
+runteq.jp / referral,28
+bing / organic,24
+chatgpt.com / (not set),18
+t.co / referral,14
+service.smt.docomo.ne.jp / referral,11
+localhost / referral,4
+mail.yahoo.co.jp / referral,3
+qiita.com / referral,3
+jariblog.online / referral,1
+l.instagram.com / referral,1
+search.fenrir-inc.com / referral,1
+streamyard.com / referral,1
+
+#  
+# 開始日: 20260101
+# 終了日: 20260314
+N 日目,new,returning
+0000,5,2
+0001,4,1
+0002,3,1
+0003,8,3
+0004,5,0
+0005,5,1
+0006,4,0
+0007,10,0
+0008,5,5
+0009,5,3
+0010,9,4
+0011,16,3
+0012,14,5
+0013,10,4
+0014,3,4
+0015,9,1
+0016,7,2
+0017,9,3
+0018,15,1
+0019,5,3
+0020,5,3
+0021,7,1
+0022,4,1
+0023,10,1
+0024,3,1
+0025,9,3
+0026,20,3
+0027,8,3
+0028,6,4
+0029,7,2
+0030,6,2
+0031,10,3
+0032,7,6
+0033,9,5
+0034,5,2
+0035,12,4
+0036,0,4
+0037,5,3
+0038,14,4
+0039,9,6
+0040,9,4
+0041,10,6
+0042,9,1
+0043,6,2
+0044,8,2
+0045,20,8
+0046,13,9
+0047,10,4
+0048,5,5
+0049,4,3
+0050,7,3
+0051,9,6
+0052,9,5
+0053,14,6
+0054,24,9
+0055,11,8
+0056,14,3
+0057,11,4
+0058,18,6
+0059,8,9
+0060,13,7
+0061,16,6
+0062,16,5
+0063,13,5
+0064,21,6
+0065,40,14
+0066,47,21
+0067,38,17
+0068,34,7
+0069,34,8
+0070,30,7
+0071,33,16
+0072,17,9
+
+# プラットフォーム上のアクティビティの比較
+# 開始日: 20260101
+# 終了日: 20260314
+プラットフォーム,キーイベント
+
+
+#  
+# 開始日: 20260101
+# 終了日: 20260314
+市区町村,アクティブ ユーザー
+Osaka,73
+Shinjuku City,52
+Fukuoka,39
+Sapporo,34
+Kobe,27
+Shibuya,26
+Yokohama,26
+Minato City,25
+Itabashi City,22
+Nagoya,20
+Kyoto,13
+Chiyoda City,12
+Sendai,11
+Setagaya City,11
+Tehran,11
+Koto City,10
+Chiba,9
+Kawasaki,9
+Shizuoka,9
+Columbus,8
+Hiroshima,8
+Kitakyushu,8
+Niigata,8
+Saitama,8
+Chuo City,7
+Shinagawa City,7
+Kumamoto,6
+Mito,6
+Nerima City,6
+Tsukuba,6
+Yokkaichi,6
+Moriya,5
+Nakano City,5
+Otsu,5
+Sakai,5
+Wakayama,5
+Yokosuka,5
+Butzbach,4
+Edogawa City,4
+Eniwa,4
+Fuchu,4
+Fukuyama,4
+Hachioji,4
+Kagoshima,4
+Kawaguchi,4
+Miyazaki,4
+Nagano,4
+Suita,4
+Tachikawa,4
+Takamatsu,4
+Toyama,4
+Toyonaka,4
+Bunkyo City,3
+Funabashi,3
+Gifu,3
+Hamamatsu,3
+Higashiosaka,3
+Himeji,3
+Hirakata,3
+Ichikawa,3
+Kurashiki,3
+Lanzhou,3
+Misawa,3
+Naha,3
+Okayama,3
+Ota City,3
+Sagamihara,3
+Suginami City,3
+Suzuka,3
+Taito City,3
+Tokushima,3
+Toshima City,3
+Utsunomiya,3
+Adachi City,2
+Arakawa City,2
+Arida,2
+Aspen,2
+Bissen,2
+Chichibu,2
+Chigasaki,2
+Fujisawa,2
+Higashihiroshima,2
+Hitachiomiya,2
+Hyuga,2
+Ibaraki,2
+Inagi,2
+Ishinomaki,2
+Itami,2
+Kakogawa,2
+Kashiwa,2
+Kasukabe,2
+Kochi,2
+Komaki,2
+Kure,2
+Kurume,2
+Maebashi,2
+Matsudo,2
+Matsue,2
+Matsuyama,2
+Miura,2
+Musashino,2
+Narashino,2
+Nishitokyo,2
+Odawara,2
+Owariasahi,2
+Oyama,2
+Seki,2
+Shibata,2
+Shimonoseki,2
+Shiraz,2
+Singapore,2
+Sumida City,2
+Tajimi,2
+Takaoka,2
+Toba,2
+Tokorozawa,2
+Toyohashi,2
+Uda,2
+Ueda,2
+Uwajima,2
+Wako,2
+Yamagata,2
+Yamatokoriyama,2
+Yonago,2
+Ageo,1
+Aira,1
+Ami,1
+Anjo,1
+Anklam,1
+Asahikawa,1
+Ashburn,1
+Athens,1
+Babol,1
+Beppu,1
+Boardman,1
+Braunschweig,1
+Bremerhaven,1
+Chikugo,1
+Chino,1
+Chita,1
+Chitose,1
+Council Bluffs,1
+Daisen,1
+Daito,1
+Dazaifu,1
+Dublin,1
+Ena,1
+Fuji,1
+Fujieda,1
+Fukui,1
+Gobo,1
+Gujo,1
+Gyoda,1
+Hannan,1
+Higashimurayama,1
+Higashiyamato,1
+Hikari,1
+Hirosaki,1
+Hitachi,1
+Hitachinaka,1
+Hokuto,1
+Honjo,1
+Iizuka,1
+Isesaki,1
+Iwaizumi,1
+Iwaki,1
+Izumi,1
+Izumo,1
+Joetsu,1
+Kaizuka,1
+Kakamigahara,1
+Kamakura,1
+Kanazawa,1
+Kanie,1
+Kannami,1
+Kanonji,1
+Kanzaki,1
+Kariya,1
+Karuizawa,1
+Kasugai,1
+Katsushika City,1
+Kazo,1
+Kikuchi,1
+Kita City,1
+Kitahiroshima,1
+Kitanagoya,1
+Kiyose,1
+Kodaira,1
+Kofu,1
+Koga,1
+Konan,1
+Konosu,1
+Kota,1
+Kumano,1
+Kusatsu,1
+Kushiro,1
+Landsberg,1
+Lille,1
+Lincoln,1
+London,1
+Machida,1
+Mannheim,1
+Matsumae,1
+Matsumoto,1
+Matsusaka,1
+Meguro City,1
+Mihama,1
+Miho,1
+Minami-Alps,1
+Minamiminowa,1
+Misato,1
+Miyaki,1
+Miyakojima,1
+Miyakonojo,1
+Miyoshi,1
+Mizunami,1
+Mobara,1
+Mori,1
+Munakata,1
+Munich,1
+Muroran,1
+Muroto,1
+Nagai,1
+Nagaoka,1
+Nagasaki,1
+Nago,1
+Nantan,1
+Nara,1
+Narita,1
+Nayoro,1
+New York,1
+Niihama,1
+Niiza,1
+Nishinomiya,1
+Nuremberg,1
+Oberasbach,1
+Oberdorla,1
+Obihiro,1
+Ogori,1
+Oita,1
+Okazaki,1
+Okinawa,1
+Ome,1
+Omihachiman,1
+Omsk,1
+Omuta,1
+Ozu,1
+Panama City,1
+Saint Petersburg,1
+San Francisco,1
+Shihoro,1
+Shikokuchuo,1
+Shimosuwa,1
+Shinshiro,1
+Shiso,1
+Soka,1
+Taka,1
+Takarazuka,1
+Takasaki,1
+Takatsuki,1
+Tamamura,1
+Tatebayashi,1
+Tateyama,1
+Tendo,1
+Toda,1
+Togane,1
+Toin,1
+Tono City,1
+Toronto,1
+Tottori,1
+Towada,1
+Tsu,1
+Tsubata,1
+Tsuchiura,1
+Tsukubamirai,1
+Tsurugashima,1
+Tsuruoka,1
+Ube,1
+Uji,1
+Unzen,1
+Urakawa,1
+Yaizu,1
+Yakhroma,1
+Yanagawa,1
+Yasugi,1
+Yurihonjo,1
+
+#  
+# 開始日: 20260101
+# 終了日: 20260314
+オーディエンス名,アクティブ ユーザー
+All Users,901
