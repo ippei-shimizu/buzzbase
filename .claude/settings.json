@@ -26,7 +26,6 @@
       "Read(./**/credentials.yml.enc)",
       "Read(./**/master.key)",
       "Bash(rm -rf *)",
-      "Bash(git checkout main)",
       "Bash(git merge *)"
     ]
   },
