@@ -3,6 +3,10 @@
   "permissions": {
     "allow": [
       "Bash(git diff *)",
+      "Bash(git diff * | head *)",
+      "Bash(git diff * 2>&1 | head *)",
+      "Bash(git diff * 2>&1; *)",
+      "Bash(for *; do *; done)",
       "Bash(git log *)",
       "Bash(git status)",
       "Bash(git branch *)",
@@ -11,6 +15,8 @@
       "Bash(git commit *)",
       "Bash(git push *)",
       "Bash(git branch --show-current && *)",
+      "Bash(git status --short && *)",
+      "Bash(git status * && *)",
       "Bash(git log origin/main..HEAD *)",
       "Bash(git remote -v)",
       "Bash(gh pr view *)",
