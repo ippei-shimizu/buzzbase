@@ -23,6 +23,7 @@ mode: bypassPermissions
 
 - PRは変更のあるサブモジュールのリポジトリに作成する（上記参照）
 - ベースブランチはデフォルトで `stg`（`$ARGUMENTS` で指定があればそちらを使用）
+- **mobileサブモジュールのみベースブランチは `main`**（front/backは `stg`）
 - Assigneeは常に `ippei-shimizu` を設定する
 - すべて日本語で記述する
 - **確認なしで即座にPRを作成する**（プレビュー・承認ステップは不要）
@@ -50,6 +51,14 @@ git status --short
 git log origin/$(git branch --show-current)..HEAD --oneline 2>/dev/null
 git log stg..HEAD --oneline
 git diff stg...HEAD --stat
+
+# mobileサブモジュール（ベースブランチは main）
+cd mobile
+git branch --show-current
+git status --short
+git log origin/$(git branch --show-current)..HEAD --oneline 2>/dev/null
+git log main..HEAD --oneline
+git diff main...HEAD --stat
 ```
 
 変更のないサブモジュールはスキップする。
@@ -153,9 +162,10 @@ cd <submodule>
 git push -u origin $(git branch --show-current)
 
 # PR作成（リポジトリはサブモジュールに対応するものを使用）
+# ベースブランチ: front/back は stg、mobile は main
 gh pr create \
-  --repo ippei-shimizu/buzzbase_<front|back> \
-  --base stg \
+  --repo ippei-shimizu/buzzbase_<front|back|mobile> \
+  --base <stg|main> \
   --title "<タイトル>" \
   --assignee ippei-shimizu \
   --body "$(cat <<'EOF'
