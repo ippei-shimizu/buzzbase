@@ -8,3 +8,5 @@ package-lock.json
 
 cookies.txt
 .env
+
+data/
