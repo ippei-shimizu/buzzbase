@@ -10,14 +10,14 @@ mode: bypassPermissions
 
 ## 対象リポジトリ
 
-**サブモジュール（front / back / mobile）のみを対象とする。ルートリポジトリ（buzzbase）ではPRを作成しない。**
+サブモジュール + ルートリポジトリの両方を対象とする。変更があるリポジトリに対してそれぞれPRを作成する:
 
-変更があるサブモジュールに対してそれぞれPRを作成する:
-- `front/` → `ippei-shimizu/buzzbase_front`
-- `back/` → `ippei-shimizu/buzzbase_back`
-- `mobile/` → `ippei-shimizu/buzzbase_mobile`
+- ルート → `ippei-shimizu/buzzbase`（ベースブランチ: `main`）
+- `front/` → `ippei-shimizu/buzzbase_front`（ベースブランチ: `stg`）
+- `back/` → `ippei-shimizu/buzzbase_back`（ベースブランチ: `stg`）
+- `mobile/` → `ippei-shimizu/buzzbase_mobile`（ベースブランチ: `main`）
 
-複数のサブモジュールに変更がある場合はそれぞれPRを作成する。issueはメインリポジトリ（`ippei-shimizu/buzzbase`）で管理されているため、issueの検索・close指定はメインリポジトリを参照する。
+複数のリポジトリに変更がある場合はそれぞれPRを作成する。issueはメインリポジトリ（`ippei-shimizu/buzzbase`）で管理されているため、issueの検索・close指定はメインリポジトリを参照する。
 
 ## ルール
 
@@ -33,9 +33,16 @@ mode: bypassPermissions
 
 ### 1. 現在のブランチ状態を確認
 
-各サブモジュールの状態を確認する:
+各リポジトリの状態を確認する:
 
 ```bash
+# ルートリポジトリ
+git branch --show-current
+git status --short
+git log origin/$(git branch --show-current)..HEAD --oneline 2>/dev/null
+git log origin/main..HEAD --oneline
+git diff origin/main...HEAD --stat
+
 # backサブモジュール
 cd back
 git branch --show-current
@@ -61,8 +68,8 @@ git log main..HEAD --oneline
 git diff main...HEAD --stat
 ```
 
-変更のないサブモジュールはスキップする。
-未コミットの変更がある場合はユーザーに通知し、先にコミットするか確認する。
+変更のないリポジトリはスキップする。
+未コミットの変更がある場合は先に `/smart-commit` でコミットする。
 
 ### 2. 差分の分析
 
