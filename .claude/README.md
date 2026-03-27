@@ -1,101 +1,61 @@
-# Claude Code Skills
+# Claude Code 設定一覧（BUZZ BASE）
 
-本プロジェクトで利用可能なClaude Codeスキル一覧。
+## Plugins
 
-## スキル一覧
+| プラグイン | 概要 |
+|---|---|
+| superpowers | 体系的な開発ワークフロー（設計→計画→TDD→レビュー） |
+| claude-md-management | CLAUDE.md の品質監査・セッション学習キャプチャ |
+| feature-dev | 7フェーズのガイド付き機能開発 |
+| commit-commands | Git操作の自動化（コミット・プッシュ・PR・ブランチ掃除） |
+| code-review | 4エージェント並列のPR自動レビュー |
+| pr-review-toolkit | 6観点の多角的PRレビュー |
+| code-simplifier | 機能を保持したリファクタリングエージェント |
+| ralph-loop | 完了条件までの自律ループ実行 |
+| plugin-dev | プラグイン開発ツールキット |
+| skill-creator | スキル作成・改善・評価 |
+| claude-code-setup | コードベース解析による自動化推薦 |
+| security-guidance | ファイル編集時のセキュリティ自動検査フック |
+| frontend-design | 本番グレードの高品質UI生成 |
+| typescript-lsp | TypeScript/JavaScript LSP連携 |
+| ruby-lsp | Ruby LSP連携 |
+| github | GitHub MCP連携 |
+| playwright | Playwright MCPブラウザテスト |
 
-### `/smart-commit` - スマートコミット
+詳細: [.claude/docs/plugin/](docs/plugin/)
 
-作業差分を分析し、論理的な単位でコミットを分割提案する。ユーザーの承認後、実際のgit操作（add / commit）も実行する。
+## Skills（カスタム）
 
-**使い方:**
-```
-/smart-commit
-/smart-commit 認証機能の実装とバグ修正を分けてコミットして
-```
+| スキル | 概要 |
+|---|---|
+| `/checkout-branch` | issue番号からサブモジュールに作業ブランチを作成 |
+| `/create-issue` | GitHub issue作成 + Projects自動追加 |
+| `/create-pr` | PR作成（テンプレート付きdescription自動生成） |
+| `/pr-description` | 既存PRのdescription自動生成・反映 |
+| `/start-worktree` | issue番号からgit worktree + 開発環境を一括セットアップ |
+| `/rspec-behavior-test` | 古典派テスト方針に基づくRSpecテスト作成 |
+| `/strategy-analysis` | 6エージェント並列の戦略分析 |
+| `react-native-skills` | React Native/Expo ベストプラクティス（自動トリガー） |
+| `vercel-react-best-practices` | React/Next.js パフォーマンス最適化（自動トリガー） |
+| `vercel-composition-patterns` | React コンポジションパターン（自動トリガー） |
 
-**トリガー例:** 「コミットを分けて」「コミットメッセージを考えて」「差分を整理して」
+詳細: [.claude/skills/README.md](skills/README.md)
 
-**機能:**
-- ステージング済み・未ステージングの全差分を取得・分析
-- 機能単位・関心の分離・依存関係を考慮してコミットを分割
-- プロジェクトのプレフィックス規約（`fix:`, `add:`, `feat:` 等）に従ったメッセージを生成
-- ユーザーの承認後に実際のコミットを実行
+## Agents
 
----
+| エージェント | 概要 |
+|---|---|
+| strategy-lead | 収益化戦略の統括・PDCAサイクル管理 |
+| ad-revenue-optimizer | AdSense・アフィリエイト広告収益の最大化 |
+| growth-marketing | ユーザー獲得・定着・SNSマーケティング |
+| product-planner | 収益化に必要な機能設計・GitHub Issue作成 |
+| market-researcher | 競合分析・市場調査・収益モデル調査 |
+| analytics-analyst | GA・Search Consoleデータ分析・データドリブン施策 |
+| react-perf-reviewer | front/配下のReactパフォーマンスレビュー |
+| composition-reviewer | front/配下のReactコンポジションパターンレビュー |
 
-### `/pr-description` - PR Description自動生成
+## Rules
 
-GitHub PRのdescriptionを自動生成し、`gh pr edit`で直接PRに反映する。
-
-**使い方:**
-```
-/pr-description
-/pr-description 123
-/pr-description https://github.com/ippei-shimizu/buzzbase/pull/123
-```
-
-**トリガー例:** 「PRのdescriptionを作成して」「PR 123のdescription書いて」
-
-**機能:**
-- `gh` CLIでPRの差分・コミット履歴を取得
-- テンプレート（実装概要・背景・受入基準・影響範囲など）に沿った日本語descriptionを生成
-- 生成後、`gh pr edit`で直接PRに反映（対話確認なしで即座に反映）
-
----
-
-### `/create-pr` - PR作成
-
-現在のブランチからGitHub PRを作成する。差分・コミット履歴を分析し、テンプレートに沿ったタイトルとdescriptionを自動生成する。
-
-**使い方:**
-```
-/create-pr
-/create-pr Claude Code設定の整備
-```
-
-**トリガー例:** 「PRを作成して」「プルリク作って」「プルリクエスト出して」
-
-**機能:**
-- ベースブランチ（main）からの全コミット・差分を分析
-- `/pr-description`と同じテンプレートでdescriptionを生成
-- プレビュー表示後、ユーザーの承認を得てからプッシュ・PR作成
-- 関連issueがあればブランチ名・コミットから自動検出
-
----
-
-### `/create-issue` - Issue作成
-
-`ippei-shimizu/buzzbase`リポジトリにGitHub issueを作成し、GitHub Projects "BUZZ BASE"に自動追加する。
-
-**使い方:**
-```
-/create-issue ログイン画面でメールアドレスのバリデーションが効いていない
-/create-issue チーム管理画面の新規追加機能
-```
-
-**トリガー例:** 「issueを作成して」「バグ報告したい」
-
-**機能:**
-- 引数からissueのタイトル・本文・ラベルを自動決定
-- テンプレート（概要・背景・対応内容・影響範囲・完了条件）に沿って本文を生成
-- 作成前にプレビューを表示し、ユーザーの承認を待つ
-- 承認後に`gh issue create`で作成し、プロジェクト "BUZZ BASE"に追加
-
----
-
-### `vercel-react-best-practices` - React/Next.jsパフォーマンス最適化
-
-Vercel Engineeringによるパフォーマンス最適化ガイドライン。`front/`ディレクトリ（Next.jsフロントエンド）のコード作成・レビュー時に自動適用される。
-
-**適用タイミング:** `front/`配下のReactコンポーネントやNext.jsページの作成・レビュー・リファクタリング時に自動で参照される（手動呼び出し不要）
-
-**カテゴリ（優先度順）:**
-1. **ウォーターフォール排除** (CRITICAL) - `Promise.all()`の活用、Suspenseストリーミング等
-2. **バンドルサイズ最適化** (CRITICAL) - barrel importの回避、動的インポート等
-3. **サーバーサイドパフォーマンス** (HIGH) - `React.cache()`、並列フェッチ等
-4. **クライアントサイドデータ取得** (MEDIUM-HIGH) - SWR活用、イベントリスナー最適化等
-5. **再レンダリング最適化** (MEDIUM) - メモ化、派生ステート、`startTransition`等
-6. **レンダリングパフォーマンス** (MEDIUM) - `content-visibility`、条件付きレンダリング等
-7. **JavaScriptパフォーマンス** (LOW-MEDIUM) - Map/Setの活用、ループ最適化等
-8. **高度なパターン** (LOW) - イベントハンドラーのref格納等
+| ルール | 概要 |
+|---|---|
+| ubiquitous-language | ドメイン用語の定義（「新チーム」等） |

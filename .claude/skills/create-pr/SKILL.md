@@ -1,48 +1,83 @@
 ---
 name: create-pr
-description: 現在のブランチからGitHub PRを作成する。差分・コミット履歴を分析し、テンプレートに沿ったタイトルとdescriptionを生成する。「PRを作成して」「プルリク作って」などのリクエストで起動する。作成前に必ずユーザーに確認を取る。
+description: 現在のブランチからGitHub PRを作成する。差分・コミット履歴を分析し、テンプレートに沿ったタイトルとdescriptionを生成する。「PRを作成して」「プルリク作って」などのリクエストで起動する。
+mode: bypassPermissions
 ---
 
 # PR作成スキル
 
 現在のブランチの変更内容を分析し、PRを作成する。
 
+## 対象リポジトリ
+
+サブモジュール + ルートリポジトリの両方を対象とする。変更があるリポジトリに対してそれぞれPRを作成する:
+
+- ルート → `ippei-shimizu/buzzbase`（ベースブランチ: `main`）
+- `front/` → `ippei-shimizu/buzzbase_front`（ベースブランチ: `stg`）
+- `back/` → `ippei-shimizu/buzzbase_back`（ベースブランチ: `stg`）
+- `mobile/` → `ippei-shimizu/buzzbase_mobile`（ベースブランチ: `main`）
+
+複数のリポジトリに変更がある場合はそれぞれPRを作成する。issueはメインリポジトリ（`ippei-shimizu/buzzbase`）で管理されているため、issueの検索・close指定はメインリポジトリを参照する。
+
 ## ルール
 
-- PRは `ippei-shimizu/buzzbase` リポジトリに作成する
+- PRは変更のあるサブモジュールのリポジトリに作成する（上記参照）
 - ベースブランチはデフォルトで `stg`（`$ARGUMENTS` で指定があればそちらを使用）
+- **mobileサブモジュールのみベースブランチは `main`**（front/backは `stg`）
+- Assigneeは常に `ippei-shimizu` を設定する
 - すべて日本語で記述する
-- 作成前に必ずユーザーの承認を得る
+- **確認なしで即座にPRを作成する**（プレビュー・承認ステップは不要）
 - リモートにプッシュされていない場合は先にプッシュする
 
 ## ワークフロー
 
 ### 1. 現在のブランチ状態を確認
 
+各リポジトリの状態を確認する:
+
 ```bash
-# 現在のブランチ名
+# ルートリポジトリ
 git branch --show-current
-
-# 未コミットの変更がないか確認
 git status --short
-
-# リモートとの同期状態を確認
 git log origin/$(git branch --show-current)..HEAD --oneline 2>/dev/null
+git log origin/main..HEAD --oneline
+git diff origin/main...HEAD --stat
 
-# ベースブランチからの全コミット
+# backサブモジュール
+cd back
+git branch --show-current
+git status --short
+git log origin/$(git branch --show-current)..HEAD --oneline 2>/dev/null
 git log stg..HEAD --oneline
-
-# ベースブランチからの全差分
 git diff stg...HEAD --stat
+
+# frontサブモジュール
+cd front
+git branch --show-current
+git status --short
+git log origin/$(git branch --show-current)..HEAD --oneline 2>/dev/null
+git log stg..HEAD --oneline
+git diff stg...HEAD --stat
+
+# mobileサブモジュール（ベースブランチは main）
+cd mobile
+git branch --show-current
+git status --short
+git log origin/$(git branch --show-current)..HEAD --oneline 2>/dev/null
+git log main..HEAD --oneline
+git diff main...HEAD --stat
 ```
 
-未コミットの変更がある場合はユーザーに通知し、先にコミットするか確認する。
+変更のないリポジトリはスキップする。
+未コミットの変更がある場合は先に `/smart-commit` でコミットする。
 
 ### 2. 差分の分析
 
-ベースブランチからの全コミットと差分を分析する:
+変更のある各サブモジュールについて分析する:
 
 ```bash
+cd <submodule>
+
 # コミットメッセージ一覧
 git log stg..HEAD --format="%s"
 
@@ -56,16 +91,31 @@ git diff stg...HEAD
 以下を把握する:
 - 変更されたファイルとその種類（新規/変更/削除）
 - 実装の目的と内容
-- 影響範囲（front / back / 両方 / その他）
-- 関連するissue番号（ブランチ名やコミットメッセージから推測）
+- 影響範囲（front / back / 両方）
 
-### 3. PRタイトルの生成
+### 3. 関連issueの特定
+
+以下の手順で関連するissue番号を特定する:
+
+1. **ブランチ名から抽出**: ブランチ名に含まれるissue番号を確認（例: `feature/123-some-feature` → #123、`fix/issue-45` → #45）
+2. **コミットメッセージから抽出**: `#123`、`close #123`、`fix #123` などのパターンを検索
+3. **GitHub Projects から検索**: 上記で見つからない場合、PRの内容に関連するissueをGitHub Projectsから検索する
+
+```bash
+# メインリポジトリのopen issueを一覧取得し、PRの内容に関連するものを探す
+gh issue list --repo ippei-shimizu/buzzbase --state open --limit 30 --json number,title,body
+```
+
+見つかった場合は `close #ISSUE_NUMBER` に設定する。
+**注意**: issueはメインリポジトリ（ippei-shimizu/buzzbase）に集約されている場合があるため、サブモジュールのPRでもメインリポジトリのissueを検索すること。
+
+### 4. PRタイトルの生成
 
 - コミット履歴と差分から変更の主目的を要約する
 - 70文字以内の簡潔な日本語タイトル
 - `$ARGUMENTS` にタイトルのヒントがあればそれを優先する
 
-### 4. PR descriptionの生成
+### 5. PR descriptionの生成
 
 `/pr-description` スキルと同じテンプレートに沿って生成する:
 
@@ -108,53 +158,40 @@ close #ISSUE_NUMBER
 <!-- 補足情報。なければ「特になし」 -->
 ```
 
-### 5. ユーザーに確認
-
-作成内容を以下のフォーマットでプレビュー表示し、承認を待つ:
-
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PR プレビュー
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ブランチ: <head-branch> → <base-branch>
-タイトル: <タイトル>
-
-本文:
-<description プレビュー>
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
-
-ユーザーの明示的な承認（「OK」「作成して」等）を待つ。承認前にPRを作成してはならない。
-フィードバックがあれば修正して再度プレビューを表示する。
-
 ### 6. プッシュとPR作成
 
-承認後、以下の順序で実行する:
+変更のある各サブモジュールに対して即座に実行する:
 
 ```bash
+cd <submodule>
+
 # リモートにプッシュされていない場合
 git push -u origin $(git branch --show-current)
 
-# PR作成
+# PR作成（リポジトリはサブモジュールに対応するものを使用）
+# ベースブランチ: front/back は stg、mobile は main
 gh pr create \
-  --repo ippei-shimizu/buzzbase \
-  --base stg \
+  --repo ippei-shimizu/buzzbase_<front|back|mobile> \
+  --base <stg|main> \
   --title "<タイトル>" \
+  --assignee ippei-shimizu \
   --body "$(cat <<'EOF'
 <description内容>
 EOF
 )"
 ```
 
+両方のサブモジュールに変更がある場合は2つのPRを作成する。
+
 ### 7. 結果報告
 
-作成されたPRのURLを表示する。
+作成されたPRのURLを表示する。複数の場合はすべてのURLを一覧表示する。
 
 ## 注意事項
 
-- ユーザーの承認なしにPRを作成しない
-- ユーザーの承認なしに `git push` しない
+- **確認なしで即座にPR作成・pushを実行する**
 - 差分から読み取れる事実に基づいて記述し、推測が入る箇所は明示する
-- issue番号がブランチ名やコミットから特定できない場合は `close #` の行は空欄にする（推測で番号を入れない）
+- issue番号が特定できない場合は `close #` の行は空欄にする（推測で番号を入れない）
+- 関連issueが見つかった場合は必ず `close #ISSUE_NUMBER` を設定する
 - `$ARGUMENTS` が指定された場合、それをPRの背景コンテキストとして活用する
 - 会話の文脈（直前の実装作業など）がある場合は、それを活用してdescriptionを充実させる

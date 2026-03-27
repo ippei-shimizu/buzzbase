@@ -1,26 +1,44 @@
 ---
 name: smart-commit
-description: 現在の作業差分を分析し、適切な粒度でコミットを分割してコミットメッセージを提案する。「コミットを分けて」「コミットメッセージを考えて」「差分を整理して」などのリクエストで起動する。ユーザーの承認後、実際のコミットとプッシュも実行する。
+description: 現在の作業差分を分析し、適切な粒度でコミットを分割し、自動で add / commit / push まで実行する。「コミットして」「コミットを分けて」「差分を整理して」などのリクエストで起動する。
+mode: bypassPermissions
 ---
 
 # Smart Commit スキル
 
-作業差分を分析し、論理的な単位でコミットを分割提案する。ユーザーの承認後、実際の git 操作（add / commit / push）も実行する。
+作業差分を分析し、論理的な単位でコミットを分割して、自動で git add / commit / push まで実行する。
+**承認なしで即実行する。途中で確認を挟まない。**
+
+## 対象リポジトリ
+
+サブモジュール + ルートリポジトリの両方を対象とする。
+
+- `front/` → `ippei-shimizu/buzzbase_front`
+- `back/` → `ippei-shimizu/buzzbase_back`
+- `mobile/` → `ippei-shimizu/buzzbase_mobile`
+- ルート → `ippei-shimizu/buzzbase`
 
 ## ワークフロー
 
 ### 1. 差分の取得
 
-```bash
-# ステージング済み + 未ステージングの変更一覧
-git status --short
+各リポジトリの差分を取得する:
 
-# 未追跡ファイルを含む全差分
+```bash
+# ルートリポジトリ（サブモジュール以外の変更）
+git status --short
 git diff HEAD
 
+# 各サブモジュール
+cd front && git status --short && git diff HEAD
+cd back && git status --short && git diff HEAD
+cd mobile && git status --short && git diff HEAD
+
 # 未追跡の新規ファイル内容
-git diff --no-index /dev/null <file>  # 新規ファイルごとに実行
+git diff --no-index /dev/null <file>
 ```
+
+変更がないリポジトリはスキップする。
 
 ### 2. 変更の分類
 
@@ -41,17 +59,34 @@ git diff --no-index /dev/null <file>  # 新規ファイルごとに実行
 ### 3. コミットメッセージの生成
 
 プロジェクトのコミットプレフィックス規約に従う:
-`fix:`, `add:`, `feat:`, `update:`, `change:`, `refactor:`, `remove:`, `test:`, `chore:`, `docs:`
+`Fix:`, `Add:`, `Update:`, `Change:`, `Refactor:`, `Remove:`, `Test:`, `Chore:`, `Docs:`
 
-メッセージは変更の「なぜ」を簡潔に記述する。日本語・英語はプロジェクトの慣習に合わせる。
+メッセージは変更の「なぜ」を日本語で簡潔に記述する。
 
-### 4. 提案の出力
+### 4. 安全チェック
 
-以下のフォーマットで出力する:
+実行前に以下を確認する（ユーザーに確認せず自動判定）:
+
+- 現在のブランチが `main` でないことを確認。`main` の場合は**中断してエラーを出す**
+- サブモジュールも同様に `main` ブランチでないことを確認
+
+### 5. 自動実行
+
+分類が完了したら、**承認を待たずに**以下を順番に自動実行する:
+
+1. **backサブモジュール**: `back/` ディレクトリで add → commit → push
+2. **frontサブモジュール**: `front/` ディレクトリで add → commit → push
+3. **mobileサブモジュール**: `mobile/` ディレクトリで add → commit → push
+4. **ルートリポジトリ**: ルートで add → commit → push（サブモジュール参照更新含む）
+
+各リポジトリで `git push -u origin $(git branch --show-current)` を実行する。
+変更がないリポジトリはスキップする。
+
+実行中は各コミットの内容を以下のフォーマットで出力する:
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-コミット 1/N
+コミット 1/N [リポジトリ名]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 メッセージ: <prefix>: <コミットメッセージ>
 
@@ -66,42 +101,25 @@ git diff --no-index /dev/null <file>  # 新規ファイルごとに実行
 
 ステータス記号: `A` = 新規追加, `M` = 変更, `D` = 削除
 
-全コミットの出力後、実行用の git コマンド一覧も表示する:
+### 6. 完了報告
 
-```bash
-# コミット 1/N: <メッセージ>
-git add <files...>
-git commit -m "<prefix>: <メッセージ>"
+すべてのコミットとプッシュが完了したら、実行結果のサマリーを出力する:
 
-# コミット 2/N: <メッセージ>
-git add <files...>
-git commit -m "<prefix>: <メッセージ>"
 ```
-
-### 5. フィードバック対応
-
-提案後、ユーザーからの調整リクエストに対応する:
-- コミットの統合・分割
-- メッセージの修正
-- ファイルの振り分け変更
-
-調整が完了したら、更新された git コマンド一覧を再出力する。
-
-### 6. コミットの実行
-
-提案内容についてユーザーの承認を得たら、提案した順序で git add / git commit を実行する。
-承認前に勝手にコミットしてはならない。必ずユーザーの明示的な承認（「OK」「実行して」「コミットして」等）を待つこと。
-
-### 7. プッシュ
-
-すべてのコミットが完了したら、現在のブランチをリモートにプッシュする。
-
-```bash
-git push -u origin $(git branch --show-current)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+完了サマリー
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+back:   N commits pushed
+front:  N commits pushed
+mobile: N commits pushed
+root:   N commits pushed
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
 ## 注意事項
 
-- ユーザーの承認なしに git add / git commit / git push を実行しない
-- サブモジュール内の変更がある場合は、サブモジュール側とメインリポジトリ側でコミットを分けて提案する
+- **承認不要で自動実行する**（差分分析 → add → commit → push を一気に行う）
+- **途中で確認を挟まない**
+- mainブランチへの直接コミット・プッシュは絶対にしない（検出した場合はエラーを出して中断する）
 - `$ARGUMENTS` が指定された場合、それを変更の背景コンテキストとして活用する
+- `.env`, `credentials.json` 等の秘密情報を含むファイルはコミットしない

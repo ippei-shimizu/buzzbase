@@ -1,20 +1,49 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
   "permissions": {
     "allow": [
       "Bash(git diff *)",
+      "Bash(git diff * | head *)",
+      "Bash(git diff * 2>&1 | head *)",
+      "Bash(git diff * 2>&1; *)",
+      "Bash(for *; do *; done)",
       "Bash(git log *)",
       "Bash(git status)",
       "Bash(git branch *)",
+      "Bash(git add *)",
+      "Bash(git add * && git commit *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git branch --show-current && *)",
+      "Bash(git status --short && *)",
+      "Bash(git status * && *)",
+      "Bash(git log origin/main..HEAD *)",
+      "Bash(git remote -v)",
       "Bash(gh pr view *)",
       "Bash(gh pr diff *)",
+      "Bash(gh pr list *)",
+      "Bash(gh pr create *)",
       "Bash(cat *)",
       "Bash(ls *)",
+      "Bash(ls -la *)",
+      "Bash(ls * 2>/dev/null || echo *)",
       "Bash(find *)",
       "Bash(wc *)",
       "Bash(head *)",
       "Bash(tail *)",
       "Bash(grep *)",
+      "Bash(cd /Users/shimizuippei/projects/dev/buzzbase && *)",
+      "Bash(cd /Users/shimizuippei/projects/dev/buzzbase/back && *)",
+      "Bash(cd /Users/shimizuippei/projects/dev/buzzbase/front && *)",
+      "Bash(cd /Users/shimizuippei/projects/dev/buzzbase/mobile && *)",
+      "Bash(ISSUE_NODE_ID=$(gh issue view * --repo ippei-shimizu/buzzbase *) && gh api graphql *)",
+      "Bash(gh api graphql *)",
+      "Bash(gh issue view *)",
+      "Bash(gh issue list *)",
+      "Bash(ls -la * 2>/dev/null)",
       "mcp__serena__*"
     ],
     "deny": [
@@ -25,11 +54,24 @@
       "Read(./**/credentials.yml.enc)",
       "Read(./**/master.key)",
       "Bash(rm -rf *)",
-      "Bash(git checkout main)",
       "Bash(git merge *)"
     ]
   },
-  "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
+    "feature-dev@claude-plugins-official": true,
+    "commit-commands@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
+    "pr-review-toolkit@claude-plugins-official": true,
+    "ralph-loop@claude-plugins-official": true,
+    "claude-code-setup@claude-plugins-official": true,
+    "playwright@claude-plugins-official": true,
+    "github@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "security-guidance@claude-plugins-official": true,
+    "code-simplifier@claude-plugins-official": true,
+    "plugin-dev@claude-plugins-official": true
   }
 }

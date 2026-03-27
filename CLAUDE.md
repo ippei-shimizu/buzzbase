@@ -4,9 +4,9 @@
 
 ## プロジェクト構造
 
-- `front/` と `back/` はgitサブモジュール（別リポジトリ）
+- `front/`、`back/`、`mobile/` はgitサブモジュール（別リポジトリ）
 - サブモジュール内の変更はサブモジュール側でコミットしてから、ルートでサブモジュール参照を更新する
-- 詳細: @front/CLAUDE.md / @back/CLAUDE.md
+- 詳細: @front/CLAUDE.md / @back/CLAUDE.md / @mobile/CLAUDE.md
 
 ## 開発環境
 
@@ -21,7 +21,9 @@
 - ブラウザ: `http://localhost:8100`
 - API直接確認: `http://localhost:3100`
 - バックエンドコマンド: `docker compose exec back <command>`（例: `docker compose exec back rails console`）
-- フロントエンドコマンド: `front/` ディレクトリで `yarn dev`, `yarn build`, `yarn lint`, `yarn check`, `yarn test`
+- フロントエンドコマンド: `front/` ディレクトリで `yarn dev`, `yarn build`, `yarn lint`, `yarn typecheck`, `yarn test`
+- バックエンドテスト: `docker compose exec back bundle exec rspec`
+- モバイルコマンド: `mobile/` ディレクトリで `yarn start`, `yarn ios`, `yarn android`
 
 ## サービス間通信
 
@@ -39,3 +41,6 @@ APIのベースパス: `/api/v1/`
 - Type: `Add`, `Fix`, `Update`, `Change`, `Refactor`, `Remove`, `Test`, `Chore`, `Docs`
 - サブモジュール更新コミット: `Fix: サブプロジェクトのコミットIDを更新`
 - **mainブランチへの直push・直commit・mergeは絶対にしない**（サブモジュールのリポジトリも同様）
+- **ブランチ名に `#` を使用しない**（CI/CDツールとの互換性のため）
+  - OK: `feature/93-private-account`, `feature/issue-93-private-account`
+  - NG: `feature/#93-private-account`

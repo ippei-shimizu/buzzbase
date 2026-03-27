@@ -26,18 +26,33 @@ gh pr diff <PR_NUMBER_OR_URL>
 gh pr view <PR_NUMBER_OR_URL> --json commits --jq '.commits[].messageHeadline'
 ```
 
-### 2. 差分の分析
+### 2. 関連issueの特定
+
+以下の手順で関連するissue番号を特定する:
+
+1. **ブランチ名から抽出**: ブランチ名に含まれるissue番号を確認（例: `feature/123-some-feature` → #123、`fix/issue-45` → #45）
+2. **コミットメッセージから抽出**: `#123`、`close #123`、`fix #123` などのパターンを検索
+3. **GitHub Projects から検索**: 上記で見つからない場合、PRの内容に関連するissueをGitHub Projectsから検索する
+
+```bash
+# リポジトリのopen issueを一覧取得し、PRの内容に関連するものを探す
+gh issue list --repo <REPO_OWNER>/<REPO_NAME> --state open --limit 30 --json number,title,body
+```
+
+PRの対象リポジトリ（PRのURLから判定）に対して検索する。見つかった場合は `close #ISSUE_NUMBER` に設定する。
+**注意**: issueはメインリポジトリ（ippei-shimizu/buzzbase）に集約されている場合があるため、サブモジュールのPRでもメインリポジトリのissueを検索すること。
+
+### 3. 差分の分析
 
 取得した差分とコミット履歴から以下を分析する:
 
 - 変更されたファイルとその種類（新規/変更/削除）
 - 実装の目的と内容
 - 影響範囲（どのモジュール・機能に影響するか）
-- 関連するissue番号（ブランチ名やコミットメッセージから推測）
 
 大きなPR（差分が多い場合）はサブエージェントを使って差分を分析する。
 
-### 3. タイトルの生成
+### 4. タイトルの生成
 
 コミット履歴と差分から変更の主目的を要約し、適切なPRタイトルを生成する:
 
@@ -45,7 +60,7 @@ gh pr view <PR_NUMBER_OR_URL> --json commits --jq '.commits[].messageHeadline'
 - 変更内容の「何を」「なぜ」が一目でわかるようにする
 - 既存のタイトルが適切でない場合は改善する
 
-### 4. descriptionの生成
+### 5. descriptionの生成
 
 以下のテンプレートに沿ってdescriptionを生成する。差分から読み取れる事実に基づいて各セクションを埋める:
 
@@ -88,12 +103,12 @@ close #ISSUE_NUMBER
 <!-- 補足情報。なければ「特になし」 -->
 ```
 
-### 5. PRへの直接反映
+### 6. PRへの直接反映
 
 生成したtitleとdescriptionを `gh pr edit` で直接PRに反映する:
 
 ```bash
-gh pr edit <PR_NUMBER> --title "<タイトル>" --body "$(cat <<'EOF'
+gh pr edit <PR_NUMBER> --title "<タイトル>" --add-assignee ippei-shimizu --body "$(cat <<'EOF'
 <description内容>
 EOF
 )"
@@ -103,7 +118,9 @@ EOF
 
 ## 注意事項
 
+- Assigneeは常に `ippei-shimizu` を設定する
 - 日本語で記述する
 - 差分から読み取れる事実に基づいて記述し、推測が入る箇所は明示する
-- issue番号がブランチ名やコミットから特定できない場合は `close #` の行は空欄にする（推測で番号を入れない）
+- issue番号が特定できない場合は `close #` の行は空欄にする（推測で番号を入れない）
+- 関連issueが見つかった場合は必ず `close #ISSUE_NUMBER` を設定する
 - 対話での確認は行わず、即座に生成・反映する
