@@ -7,37 +7,38 @@ mode: bypassPermissions
 # Smart Commit スキル
 
 作業差分を分析し、論理的な単位でコミットを分割して、自動で git add / commit / push まで実行する。
+**承認なしで即実行する。途中で確認を挟まない。**
 
 ## 対象リポジトリ
 
-**サブモジュール（front / back / mobile）のみを対象とする。ルートリポジトリ（buzzbase）はコミット・プッシュの対象外。**
+サブモジュール + ルートリポジトリの両方を対象とする。
 
 - `front/` → `ippei-shimizu/buzzbase_front`
 - `back/` → `ippei-shimizu/buzzbase_back`
 - `mobile/` → `ippei-shimizu/buzzbase_mobile`
-
-ルートリポジトリでのサブモジュール参照更新（`git add front back && git commit`）は行わない。
-ルートリポジトリでの作業ブランチ作成も不要。
+- ルート → `ippei-shimizu/buzzbase`
 
 ## ワークフロー
 
 ### 1. 差分の取得
 
-各サブモジュールに対して差分を取得する:
+各リポジトリの差分を取得する:
 
 ```bash
-# backサブモジュール
-cd back && git status --short && git diff HEAD
+# ルートリポジトリ（サブモジュール以外の変更）
+git status --short
+git diff HEAD
 
-# frontサブモジュール
+# 各サブモジュール
 cd front && git status --short && git diff HEAD
-
-# mobileサブモジュール
+cd back && git status --short && git diff HEAD
 cd mobile && git status --short && git diff HEAD
 
 # 未追跡の新規ファイル内容
-git diff --no-index /dev/null <file>  # 新規ファイルごとに実行
+git diff --no-index /dev/null <file>
 ```
+
+変更がないリポジトリはスキップする。
 
 ### 2. 変更の分類
 
@@ -62,22 +63,30 @@ git diff --no-index /dev/null <file>  # 新規ファイルごとに実行
 
 メッセージは変更の「なぜ」を日本語で簡潔に記述する。
 
-### 4. 自動実行
+### 4. 安全チェック
 
-分類が完了したら、承認を待たずに以下を順番に自動実行する:
+実行前に以下を確認する（ユーザーに確認せず自動判定）:
 
-1. **backサブモジュール**: `back/` ディレクトリで add / commit / push を実行
-2. **frontサブモジュール**: `front/` ディレクトリで add / commit / push を実行
-3. **mobileサブモジュール**: `mobile/` ディレクトリで add / commit / push を実行
-4. **プッシュ**: 各サブモジュールで `git push -u origin $(git branch --show-current)` を実行
+- 現在のブランチが `main` でないことを確認。`main` の場合は**中断してエラーを出す**
+- サブモジュールも同様に `main` ブランチでないことを確認
 
-**注意: ルートリポジトリでのコミット・プッシュは行わない。**
+### 5. 自動実行
+
+分類が完了したら、**承認を待たずに**以下を順番に自動実行する:
+
+1. **backサブモジュール**: `back/` ディレクトリで add → commit → push
+2. **frontサブモジュール**: `front/` ディレクトリで add → commit → push
+3. **mobileサブモジュール**: `mobile/` ディレクトリで add → commit → push
+4. **ルートリポジトリ**: ルートで add → commit → push（サブモジュール参照更新含む）
+
+各リポジトリで `git push -u origin $(git branch --show-current)` を実行する。
+変更がないリポジトリはスキップする。
 
 実行中は各コミットの内容を以下のフォーマットで出力する:
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-コミット 1/N
+コミット 1/N [リポジトリ名]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 メッセージ: <prefix>: <コミットメッセージ>
 
@@ -92,14 +101,25 @@ git diff --no-index /dev/null <file>  # 新規ファイルごとに実行
 
 ステータス記号: `A` = 新規追加, `M` = 変更, `D` = 削除
 
-### 5. 完了報告
+### 6. 完了報告
 
-すべてのコミットとプッシュが完了したら、実行結果のサマリーを出力する。
+すべてのコミットとプッシュが完了したら、実行結果のサマリーを出力する:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+完了サマリー
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+back:   N commits pushed
+front:  N commits pushed
+mobile: N commits pushed
+root:   N commits pushed
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
 
 ## 注意事項
 
 - **承認不要で自動実行する**（差分分析 → add → commit → push を一気に行う）
+- **途中で確認を挟まない**
 - mainブランチへの直接コミット・プッシュは絶対にしない（検出した場合はエラーを出して中断する）
-- **ルートリポジトリ（buzzbase）ではコミット・プッシュ・ブランチ作成を行わない**
-- **対象はサブモジュール（front / back / mobile）のみ**
 - `$ARGUMENTS` が指定された場合、それを変更の背景コンテキストとして活用する
+- `.env`, `credentials.json` 等の秘密情報を含むファイルはコミットしない
