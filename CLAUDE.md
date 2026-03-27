@@ -4,9 +4,9 @@
 
 ## プロジェクト構造
 
-- `front/` と `back/` はgitサブモジュール（別リポジトリ）
+- `front/`、`back/`、`mobile/` はgitサブモジュール（別リポジトリ）
 - サブモジュール内の変更はサブモジュール側でコミットしてから、ルートでサブモジュール参照を更新する
-- 詳細: @front/CLAUDE.md / @back/CLAUDE.md
+- 詳細: @front/CLAUDE.md / @back/CLAUDE.md / @mobile/CLAUDE.md
 
 ## 開発環境
 
@@ -22,6 +22,8 @@
 - API直接確認: `http://localhost:3100`
 - バックエンドコマンド: `docker compose exec back <command>`（例: `docker compose exec back rails console`）
 - フロントエンドコマンド: `front/` ディレクトリで `yarn dev`, `yarn build`, `yarn lint`, `yarn typecheck`, `yarn test`
+- バックエンドテスト: `docker compose exec back bundle exec rspec`
+- モバイルコマンド: `mobile/` ディレクトリで `yarn start`, `yarn ios`, `yarn android`
 
 ## サービス間通信
 
