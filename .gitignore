@@ -37,5 +37,7 @@ package-lock.json
 
 cookies.txt
 .env
+.mcp.json
 
 data/
+.superpowers/
