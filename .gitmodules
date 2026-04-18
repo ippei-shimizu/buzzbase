@@ -1,12 +1,9 @@
 [submodule "front"]
 	path = front
 	url = git@github.com:ippei-shimizu/buzzbase_front.git
-	ignore = all
 [submodule "back"]
 	path = back
 	url = git@github.com:ippei-shimizu/buzzbase_back.git
-	ignore = all
 [submodule "mobile"]
 	path = mobile
 	url = git@github.com:ippei-shimizu/buzzbase_mobile.git
-	ignore = all
