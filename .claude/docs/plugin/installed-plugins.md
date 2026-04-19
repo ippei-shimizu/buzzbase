@@ -31,4 +31,3 @@
 | `commit-commands` | `smart-commit`（削除済み） | `/commit` で同等機能。CLAUDE.mdの日本語ルール優先 |
 | `code-review` | — | `/create-pr` と組み合わせて使う |
 | `frontend-design` | — | 既存の ui-ux-pro-max スキルと補完関係 |
-| `typescript-lsp` / `ruby-lsp` | — | serena MCPと補完関係 |

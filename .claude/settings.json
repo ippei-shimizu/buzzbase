@@ -47,8 +47,7 @@
       "Bash(gh api graphql *)",
       "Bash(gh issue view *)",
       "Bash(gh issue list *)",
-      "Bash(ls -la * 2>/dev/null)",
-      "mcp__serena__*"
+      "Bash(ls -la * 2>/dev/null)"
     ],
     "deny": [
       "Bash(curl *)",
