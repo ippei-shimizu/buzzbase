@@ -51,3 +51,34 @@ APIのベースパス: `/api/v1/`
 - **ブランチ名に `#` を使用しない**（CI/CDツールとの互換性のため）
   - OK: `feature/93-private-account`, `feature/issue-93-private-account`
   - NG: `feature/#93-private-account`
+
+## Sentry運用ルール
+
+エラー監視はSentry（無料 Developerプラン）。GitHub Integration有効化済み。
+
+### Issue対応フロー（手動Resolve運用）
+
+無料プランでは GitHub Status Sync が使えないため、Sentry Issueの解決はSentry UIで手動Resolveする。
+
+| 状態 | 操作 | 用途 |
+| ---- | ---- | ---- |
+| Unresolved | デフォルト | 未調査・未対応 |
+| Resolved | Sentry UIで「Resolve」ボタン | 対応完了。再発時は自動Regression検知（無料で動く） |
+| Archive (until X occurrences) | Sentry UIで操作 | 様子見・通知抑制したい既知Issue |
+
+### 無料で使える連携機能
+
+- **Suspect Commits**: Issue画面に「原因の可能性が高いコミット」が自動表示
+- **Suspect PR Comments**: 怪しいPRにSentryが自動でコメント（PR時点で気付ける）
+- **Stack Trace Linking**: スタックトレース行からGitHubソースへジャンプ（Code Mappings設定後）
+- **Regression検知**: Resolved後に再発したIssueを自動再オープン＋通知
+
+### 将来的に整備するもの（任意）
+
+`Fixes <SENTRY-SHORT-ID>` キーワードによる自動Resolveを動かすには、GitHub Actionsで `sentry-cli releases new` + `set-commits` を設定する必要がある（Sentry Auth Token発行 + Heroku Labs設定 + Rails initializer修正）。当面は手動Resolveで運用し、必要に応じて後日整備する。
+
+### Sentry組織情報
+
+- Organization: `0dd1e9c639d9`
+- Projects: `buzzbase-frontend`, `buzzbase-backend`, `buzzbase-mobile`
+- ダッシュボード: https://0dd1e9c639d9.sentry.io/
