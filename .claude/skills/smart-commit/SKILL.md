@@ -11,123 +11,105 @@ allowedTools:
 
 # Smart Commit スキル
 
-作業差分を分析し、論理的な単位でコミットを分割して、自動で git add / commit / push まで実行する。
+作業差分を論理的単位で分割し、自動で add / commit / push する。
 
 ## 絶対ルール
 
-- **ユーザーへの確認・承認は一切行わない**
-- **プレビュー表示して「よろしいですか？」と聞かない**
-- **差分分析 → グルーピング → add → commit → push をすべて一気に自動実行する**
-- **途中で止まらない。質問しない。報告は実行後のサマリーのみ。**
+- ユーザー確認・承認は**一切行わない**。差分分析→add→commit→push を一気に実行
+- mainブランチでの直接コミット・pushは禁止（検出時は中断してエラー）
+- 報告は**実行後のサマリーのみ**
 
-## 対象リポジトリ
+## 対象リポジトリ（絶対パス使用）
 
-サブモジュール + ルートリポジトリの両方を対象とする。
+| リポジトリ | パス |
+| ---------- | ---- |
+| ルート | `/Users/shimizuippei/projects/dev/buzzbase` |
+| front | `/Users/shimizuippei/projects/dev/buzzbase/front` |
+| back | `/Users/shimizuippei/projects/dev/buzzbase/back` |
+| mobile | `/Users/shimizuippei/projects/dev/buzzbase/mobile` |
 
-- `front/` → `ippei-shimizu/buzzbase_front`
-- `back/` → `ippei-shimizu/buzzbase_back`
-- `mobile/` → `ippei-shimizu/buzzbase_mobile`
-- ルート → `ippei-shimizu/buzzbase`
+## トークン削減原則
+
+- 最初に `status --short` で**変更があるリポジトリだけに絞る**。他は以後すべてスキップ
+- 分類は **`diff --stat` + `diff --name-status`** で十分。フルdiffは**分類が曖昧な場合のみ**個別ファイル単位で取得
+- 新規ファイルの中身は**ファイル名・拡張子から推測**で分類。中身読み込みは最終手段
 
 ## ワークフロー
 
-### 1. 差分の取得
-
-各リポジトリの差分を取得する:
+### 1. 変更検出（status --short のみを各リポジトリで1回）
 
 ```bash
-# 絶対パスを定数として使う
-ROOT=/Users/shimizuippei/projects/dev/buzzbase
-
-# ルートリポジトリ（サブモジュール以外の変更）
-git -C $ROOT status --short
-git -C $ROOT diff HEAD
-
-# 各サブモジュール（必ず絶対パスを使う）
-git -C $ROOT/front status --short
-git -C $ROOT/front diff HEAD
-git -C $ROOT/back status --short
-git -C $ROOT/back diff HEAD
-git -C $ROOT/mobile status --short
-git -C $ROOT/mobile diff HEAD
-
-# 未追跡の新規ファイル内容
-git -C $ROOT diff --no-index /dev/null <file>
+git -C /Users/shimizuippei/projects/dev/buzzbase status --short
+git -C /Users/shimizuippei/projects/dev/buzzbase/front status --short
+git -C /Users/shimizuippei/projects/dev/buzzbase/back status --short
+git -C /Users/shimizuippei/projects/dev/buzzbase/mobile status --short
 ```
 
-**重要: `git -C` には必ず絶対パスを使う。** cwdがサブモジュール内の場合、相対パス `git -C front` は失敗する。
+出力が空のリポジトリは以後**完全にスキップ**（diff も log も投げない）。
 
-変更がないリポジトリはスキップする。
+### 2. ブランチ確認（変更ありリポジトリのみ）
 
-### 2. 変更の分類
+```bash
+git -C <path> branch --show-current
+```
 
-各ファイルの変更内容を分析し、以下の観点でグルーピングする:
+`main` の場合は中断・エラー。
 
-- **機能単位**: 同じ機能に関する変更はまとめる（例: コントローラ + テスト + ルーティング）
-- **関心の分離**: 設定変更、リファクタリング、新機能、バグ修正は分ける
-- **依存関係**: 後のコミットが前のコミットに依存する場合、依存される側を先にする
+### 3. グルーピング情報取得（変更ありリポジトリのみ）
 
-#### 分割の粒度ガイドライン
+```bash
+git -C <path> diff --stat HEAD
+git -C <path> diff --name-status HEAD
+```
 
-- 1コミット = 1つの論理的変更（「なぜこの変更をしたか」を1文で説明できる単位）
-- 設定ファイルの変更（Gemfile, package.json 等）は関連する機能変更と同じコミットに含める
-- テストは対応する実装と同じコミットにする
-- リンティング修正やフォーマット変更は独立したコミットにする
-- ファイル削除は、その理由となる変更と同じコミットにまとめる
+ファイル一覧 + 変更行数 + 種類（A/M/D）が取得できる。**フルdiffは投げない**。
 
-### 3. コミットメッセージの生成
+### 4. コミット分割
 
-プロジェクトのコミットプレフィックス規約に従う:
-`Fix:`, `Add:`, `Update:`, `Change:`, `Refactor:`, `Remove:`, `Test:`, `Chore:`, `Docs:`
+ファイルパス・拡張子・ステータスから分類：
 
-メッセージは変更の「なぜ」を日本語で簡潔に記述する。
+- **機能単位**: 同じ機能・モジュール配下のファイルはまとめる
+- **テスト**: 対応する実装と同コミット
+- **設定ファイル**（package.json, Gemfile等）: 関連する機能変更と同コミット
+- **lint/format修正**: 単独コミット
+- **削除のみ**: 理由となる変更と同コミット
 
-### 4. 安全チェック
+1コミット = 1つの「なぜ」で説明できる単位。
 
-実行前に以下を確認する（ユーザーに確認せず自動判定）:
+### 5. コミットメッセージ生成
 
-- 現在のブランチが `main` でないことを確認。`main` の場合は**中断してエラーを出す**
-- サブモジュールも同様に `main` ブランチでないことを確認
+プレフィックス: `Add:` / `Fix:` / `Update:` / `Change:` / `Refactor:` / `Remove:` / `Test:` / `Chore:` / `Docs:`
 
-### 5. 自動実行
+ファイル名・パスから内容推測。**曖昧な場合のみ**該当ファイルの diff を個別取得：
 
-分類が完了したら、**承認を待たずに**以下を順番に自動実行する:
+```bash
+git -C <path> diff HEAD -- <file>
+```
 
-1. **backサブモジュール**: `git -C /Users/shimizuippei/projects/dev/buzzbase/back` で add → commit → push
-2. **frontサブモジュール**: `git -C /Users/shimizuippei/projects/dev/buzzbase/front` で add → commit → push
-3. **mobileサブモジュール**: `git -C /Users/shimizuippei/projects/dev/buzzbase/mobile` で add → commit → push
-4. **ルートリポジトリ**: `git -C /Users/shimizuippei/projects/dev/buzzbase` で add → commit → push（サブモジュール参照更新含む）
+メッセージは日本語で「なぜ」を簡潔に。
 
-## コマンド実行ルール
+### 6. add / commit / push（自動実行）
 
-- **`cd dir && git ...` は絶対に使わない** → Claude Codeのセキュリティチェックで承認を求められる
-- **`git -C` には必ず絶対パスを使う** → cwdがサブモジュール内の場合、相対パスは失敗する
-- **`echo "..."` を含む複合コマンドは使わない** → 「quoted characters in flag names」で承認を求められる
-- 各コマンドは個別のBash呼び出しで実行する（`&&` でのチェーンは最小限にする）
-変更がないリポジトリはスキップする。
+実行順序: **back → front → mobile → ルート**（ルートはサブモジュール参照更新を含むため最後）
 
-実行中は各コミットの内容を以下のフォーマットで出力する:
+```bash
+git -C <path> add <files>
+git -C <path> commit -m "Type: 説明"
+git -C <path> push origin <branch>
+```
+
+各コミット時に出力：
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-コミット 1/N [リポジトリ名]
+コミット N/M [リポジトリ名]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-メッセージ: <prefix>: <コミットメッセージ>
-
-対象ファイル:
-  A  path/to/new-file.ts
-  M  path/to/modified-file.rb
-  D  path/to/deleted-file.ts
-
-変更概要: <このコミットで何をしたかの1行説明>
+メッセージ: Type: 説明
+ファイル: A app/foo.ts / M app/bar.ts
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-ステータス記号: `A` = 新規追加, `M` = 変更, `D` = 削除
-
-### 6. 完了報告
-
-すべてのコミットとプッシュが完了したら、実行結果のサマリーを出力する:
+### 7. 完了サマリー
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -140,10 +122,14 @@ root:   N commits pushed
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-## 注意事項
+## コマンド実行制約
 
-- **絶対にユーザーに確認を求めない。プレビュー表示して承認を待つことも禁止。**
-- **差分分析が終わったら即座にgitコマンドを実行する**
-- mainブランチへの直接コミット・プッシュは絶対にしない（検出した場合はエラーを出して中断する）
-- `$ARGUMENTS` が指定された場合、それを変更の背景コンテキストとして活用する
-- `.env`, `credentials.json` 等の秘密情報を含むファイルはコミットしない
+- `cd ... && git ...` 禁止（権限プロンプトの原因）
+- `git -C` には**必ず絶対パス**
+- `echo "..."` を含む複合コマンドを Bash 一発で書かない
+- コマンドは個別 Bash 呼び出し
+
+## 安全
+
+- `.env` / `credentials.*` / `master.key` 等の秘密情報はコミットしない
+- `$ARGUMENTS` があれば変更の背景コンテキストとして活用
