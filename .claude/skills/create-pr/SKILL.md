@@ -2,196 +2,151 @@
 name: create-pr
 description: 現在のブランチからGitHub PRを作成する。差分・コミット履歴を分析し、テンプレートに沿ったタイトルとdescriptionを生成する。「PRを作成して」「プルリク作って」などのリクエストで起動する。
 mode: bypassPermissions
+allowedTools:
+  - Bash
+  - Read
+  - Glob
+  - Grep
 ---
 
 # PR作成スキル
 
-現在のブランチの変更内容を分析し、PRを作成する。
+現在のブランチからPRを作成する。確認なしで即実行。
 
-## 対象リポジトリ
+## 絶対ルール
 
-サブモジュール + ルートリポジトリの両方を対象とする。変更があるリポジトリに対してそれぞれPRを作成する:
+- ユーザー確認・承認は**一切行わない**。分析→PR作成を即実行
+- 報告は**実行後の結果のみ**
 
-- ルート → `ippei-shimizu/buzzbase`（ベースブランチ: `main`）
-- `front/` → `ippei-shimizu/buzzbase_front`（ベースブランチ: `stg`）
-- `back/` → `ippei-shimizu/buzzbase_back`（ベースブランチ: `stg`）
-- `mobile/` → `ippei-shimizu/buzzbase_mobile`（ベースブランチ: `main`）
+## 対象リポジトリとベースブランチ
 
-複数のリポジトリに変更がある場合はそれぞれPRを作成する。issueはメインリポジトリ（`ippei-shimizu/buzzbase`）で管理されているため、issueの検索・close指定はメインリポジトリを参照する。
+| パス | リポジトリ | ベースブランチ |
+| ---- | ---------- | -------------- |
+| `/Users/shimizuippei/projects/dev/buzzbase` | `ippei-shimizu/buzzbase` | `main` |
+| `/Users/shimizuippei/projects/dev/buzzbase/front` | `ippei-shimizu/buzzbase_front` | `stg` |
+| `/Users/shimizuippei/projects/dev/buzzbase/back` | `ippei-shimizu/buzzbase_back` | `stg` |
+| `/Users/shimizuippei/projects/dev/buzzbase/mobile` | `ippei-shimizu/buzzbase_mobile` | `main` |
 
-## ルール
+issueはメインリポジトリ（`ippei-shimizu/buzzbase`）で集約管理。サブモジュールのPRでもメインリポジトリのissueを参照する。
 
-- PRは変更のあるサブモジュールのリポジトリに作成する（上記参照）
-- ベースブランチはデフォルトで `stg`（`$ARGUMENTS` で指定があればそちらを使用）
-- **mobileサブモジュールのみベースブランチは `main`**（front/backは `stg`）
-- Assigneeは常に `ippei-shimizu` を設定する
-- すべて日本語で記述する
-- **確認なしで即座にPRを作成する**（プレビュー・承認ステップは不要）
-- リモートにプッシュされていない場合は先にプッシュする
+## トークン削減原則
+
+- **`status --short` を最初に1回**回し、変更ありリポジトリだけに絞る。他はスキップ
+- description は**コミットメッセージ（`log --format="%s"`）+ ファイル統計（`diff --stat`）から生成**。フルdiffは投げない
+- diff の中身が必要な場合のみ `diff --name-status` を追加で取得
+- 会話文脈に直前の作業があれば**それを最優先でdescriptionに反映**（git解析を最小化）
 
 ## ワークフロー
 
-### 1. 現在のブランチ状態を確認
-
-各リポジトリの状態を確認する:
+### 1. 変更ありリポジトリの絞り込み
 
 ```bash
-# ルートリポジトリ
-git branch --show-current
-git status --short
-git log origin/$(git branch --show-current)..HEAD --oneline 2>/dev/null
-git log origin/main..HEAD --oneline
-git diff origin/main...HEAD --stat
-
-# backサブモジュール
-cd back
-git branch --show-current
-git status --short
-git log origin/$(git branch --show-current)..HEAD --oneline 2>/dev/null
-git log stg..HEAD --oneline
-git diff stg...HEAD --stat
-
-# frontサブモジュール
-cd front
-git branch --show-current
-git status --short
-git log origin/$(git branch --show-current)..HEAD --oneline 2>/dev/null
-git log stg..HEAD --oneline
-git diff stg...HEAD --stat
-
-# mobileサブモジュール（ベースブランチは main）
-cd mobile
-git branch --show-current
-git status --short
-git log origin/$(git branch --show-current)..HEAD --oneline 2>/dev/null
-git log main..HEAD --oneline
-git diff main...HEAD --stat
+git -C /Users/shimizuippei/projects/dev/buzzbase status --short
+git -C /Users/shimizuippei/projects/dev/buzzbase/front status --short
+git -C /Users/shimizuippei/projects/dev/buzzbase/back status --short
+git -C /Users/shimizuippei/projects/dev/buzzbase/mobile status --short
 ```
 
-変更のないリポジトリはスキップする。
-未コミットの変更がある場合は先に `/smart-commit` でコミットする。
+未コミット変更がある場合は先に `/smart-commit` で処理。
 
-### 2. 差分の分析
+各リポジトリで `branch --show-current` してブランチ名取得。ベースブランチと一致するリポジトリ・空のリポジトリはスキップ。
 
-変更のある各サブモジュールについて分析する:
+### 2. 変更内容の取得（変更ありリポジトリのみ）
 
 ```bash
-cd <submodule>
+# コミットメッセージ
+git -C <path> log <base>..HEAD --format="%s"
 
-# コミットメッセージ一覧
-git log stg..HEAD --format="%s"
-
-# 変更ファイル一覧
-git diff stg...HEAD --stat
-
-# 詳細な差分（大きい場合はサブエージェントで分析）
-git diff stg...HEAD
+# ファイル統計
+git -C <path> diff <base>...HEAD --stat
 ```
 
-以下を把握する:
-- 変更されたファイルとその種類（新規/変更/削除）
-- 実装の目的と内容
-- 影響範囲（front / back / 両方）
+これだけで title / description は十分書ける。**フルdiffは原則投げない**。
 
-### 3. 関連issueの特定
+`<base>` は表参照（front/back: `stg`、mobile/ルート: `main`）。`$ARGUMENTS` でベース指定があれば優先。
 
-以下の手順で関連するissue番号を特定する:
+### 3. issue番号特定
 
-1. **ブランチ名から抽出**: ブランチ名に含まれるissue番号を確認（例: `feature/123-some-feature` → #123、`fix/issue-45` → #45）
-2. **コミットメッセージから抽出**: `#123`、`close #123`、`fix #123` などのパターンを検索
-3. **GitHub Projects から検索**: 上記で見つからない場合、PRの内容に関連するissueをGitHub Projectsから検索する
+優先順位:
+
+1. ブランチ名から抽出（例: `chore/154-...` → #154、`fix/issue-45` → #45）
+2. コミットメッセージから抽出（`#123`, `close #123`, `fix #123`）
+3. 上記で不明なら、メインリポジトリの open issues から PR内容に近いものを検索:
 
 ```bash
-# メインリポジトリのopen issueを一覧取得し、PRの内容に関連するものを探す
-gh issue list --repo ippei-shimizu/buzzbase --state open --limit 30 --json number,title,body
+gh issue list --repo ippei-shimizu/buzzbase --state open --limit 30 --json number,title
 ```
 
-見つかった場合は `close #ISSUE_NUMBER` に設定する。
-**注意**: issueはメインリポジトリ（ippei-shimizu/buzzbase）に集約されている場合があるため、サブモジュールのPRでもメインリポジトリのissueを検索すること。
+見つかれば `close #ISSUE_NUMBER`。**推測で番号を入れない**。不明なら空欄。
 
-### 4. PRタイトルの生成
+### 4. タイトル・description生成
 
-- コミット履歴と差分から変更の主目的を要約する
-- 70文字以内の簡潔な日本語タイトル
-- `$ARGUMENTS` にタイトルのヒントがあればそれを優先する
-
-### 5. PR descriptionの生成
-
-`/pr-description` スキルと同じテンプレートに沿って生成する:
+- タイトル: 70文字以内・日本語・コミットメッセージから要約。`$ARGUMENTS` にヒントあれば優先
+- description: 下のテンプレートに沿う。**会話文脈優先**、不足部分のみコミット情報で補完
 
 ```markdown
 ## issue
 close #ISSUE_NUMBER
 
 ## 実装概要
-<!-- 何をしたかを簡潔に（1-3行） -->
+<!-- 1-3行 -->
 
 ## 背景
-<!-- なぜこの変更が必要だったか -->
+<!-- なぜ -->
 
 ## やらなかったこと
-<!-- スコープ外にしたこと。なければ「特になし」 -->
+<!-- スコープ外。なければ「特になし」 -->
 
 ## 受入基準
-<!-- この PR がマージ可能と判断するための条件をチェックリストで -->
 - [ ] 基準1
 - [ ] 基準2
 
 ## 実装詳細
-<!-- 技術的な実装内容。ファイル単位やモジュール単位で説明 -->
+<!-- ファイル単位/モジュール単位 -->
 
 ## スクリーンショット
-<!-- UI変更がある場合のみ。なければ「なし」 -->
+<!-- UI変更時のみ。なければ「なし」 -->
 
 ## 確認手順
-<!-- レビュワーが動作確認するための具体的な手順 -->
 1. 手順1
 2. 手順2
 
 ## 影響範囲
-<!-- この変更が影響する画面・機能・モジュール -->
 
 ## コード上の懸念点
-<!-- レビュワーに特に見てほしい箇所や、判断に迷った実装 -->
 
 ## その他
-<!-- 補足情報。なければ「特になし」 -->
+<!-- なければ「特になし」 -->
 ```
 
-### 6. プッシュとPR作成
-
-変更のある各サブモジュールに対して即座に実行する:
+### 5. push + PR作成（即実行）
 
 ```bash
-cd <submodule>
+# 必要ならpush
+git -C <path> push -u origin <branch>
 
-# リモートにプッシュされていない場合
-git push -u origin $(git branch --show-current)
-
-# PR作成（リポジトリはサブモジュールに対応するものを使用）
-# ベースブランチ: front/back は stg、mobile は main
+# PR作成
 gh pr create \
-  --repo ippei-shimizu/buzzbase_<front|back|mobile> \
-  --base <stg|main> \
-  --title "<タイトル>" \
+  --repo <repo> \
+  --head <branch> \
+  --base <base> \
+  --title "<title>" \
   --assignee ippei-shimizu \
   --body "$(cat <<'EOF'
-<description内容>
+<description>
 EOF
 )"
 ```
 
-両方のサブモジュールに変更がある場合は2つのPRを作成する。
+複数リポジトリに変更がある場合は各々で作成。
 
-### 7. 結果報告
+### 6. 結果報告
 
-作成されたPRのURLを表示する。複数の場合はすべてのURLを一覧表示する。
+作成された PR の URL を一覧表示。
 
-## 注意事項
+## コマンド実行制約
 
-- **確認なしで即座にPR作成・pushを実行する**
-- 差分から読み取れる事実に基づいて記述し、推測が入る箇所は明示する
-- issue番号が特定できない場合は `close #` の行は空欄にする（推測で番号を入れない）
-- 関連issueが見つかった場合は必ず `close #ISSUE_NUMBER` を設定する
-- `$ARGUMENTS` が指定された場合、それをPRの背景コンテキストとして活用する
-- 会話の文脈（直前の実装作業など）がある場合は、それを活用してdescriptionを充実させる
+- `cd ... && git ...` 禁止
+- `git -C` には**必ず絶対パス**
+- `echo "..."` を含む複合コマンドを Bash 一発で書かない
+- コマンドは個別 Bash 呼び出し

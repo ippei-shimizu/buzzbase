@@ -35,16 +35,19 @@
       "Bash(head *)",
       "Bash(tail *)",
       "Bash(grep *)",
+      "Bash(cd /Users/shimizuippei/projects/dev/buzzbase*)",
       "Bash(cd /Users/shimizuippei/projects/dev/buzzbase && *)",
       "Bash(cd /Users/shimizuippei/projects/dev/buzzbase/back && *)",
+      "Bash(cd /Users/shimizuippei/projects/dev/buzzbase/back*)",
       "Bash(cd /Users/shimizuippei/projects/dev/buzzbase/front && *)",
+      "Bash(cd /Users/shimizuippei/projects/dev/buzzbase/front*)",
       "Bash(cd /Users/shimizuippei/projects/dev/buzzbase/mobile && *)",
+      "Bash(cd /Users/shimizuippei/projects/dev/buzzbase/mobile*)",
       "Bash(ISSUE_NODE_ID=$(gh issue view * --repo ippei-shimizu/buzzbase *) && gh api graphql *)",
       "Bash(gh api graphql *)",
       "Bash(gh issue view *)",
       "Bash(gh issue list *)",
-      "Bash(ls -la * 2>/dev/null)",
-      "mcp__serena__*"
+      "Bash(ls -la * 2>/dev/null)"
     ],
     "deny": [
       "Bash(curl *)",
@@ -57,8 +60,21 @@
       "Bash(git merge *)"
     ]
   },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/auto-lint.sh\"",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  },
   "enabledPlugins": {
-    "superpowers@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
     "feature-dev@claude-plugins-official": true,
     "commit-commands@claude-plugins-official": true,
