@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# PostToolUse hook: Edit/Write 後に変更ファイルのリンター・フォーマッターを自動実行
+# PostToolUse hook: Edit/Write 後に変更ファイルのリンター・フォーマッター・関連テストを自動実行
+# すべて変更ファイル単位で実行する（プロジェクト全体は走らせない）
 
 set -e
 
@@ -17,12 +18,24 @@ fi
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-/Users/shimizuippei/projects/dev/buzzbase}"
 
+# 変更ファイルに関連するJestテストのみ実行（TypeScript/JavaScript）
+# 実装ファイル → 関連test、テストファイル → 自身。関連が無ければスキップ
+run_related_jest() {
+  local file="$1"
+  case "$file" in
+    *.ts | *.tsx | *.js | *.jsx)
+      npx jest --findRelatedTests "$file" --passWithNoTests --silent 2>/dev/null || true
+      ;;
+  esac
+}
+
 # front/
 if [[ "$FILE" == *"/front/"* ]]; then
   cd "$PROJECT_DIR/front"
   npx prettier --write "$FILE" 2>/dev/null || true
   npx eslint --fix "$FILE" 2>/dev/null || true
   npx tsc --noEmit 2>/dev/null || true
+  run_related_jest "$FILE"
   exit 0
 fi
 
@@ -40,6 +53,7 @@ if [[ "$FILE" == *"/mobile/"* ]]; then
   npx prettier --write "$FILE" 2>/dev/null || true
   npx eslint --fix "$FILE" 2>/dev/null || true
   npx tsc --noEmit 2>/dev/null || true
+  run_related_jest "$FILE"
   exit 0
 fi
 
