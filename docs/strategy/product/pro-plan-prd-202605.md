@@ -8,13 +8,14 @@
 
 ## このPRDの位置づけ
 
-戦略ドキュメント（`pro-plan-202605.md`）で決まった意思決定を踏まえ、**エンジニアが実装に迷わない具体的設計図** を提供する。
+戦略ドキュメント（`pro-plan-202605.md`）で決まった意思決定を踏まえ、**プロダクト要件と技術設計を分離して** 管理する。
 
-| ドキュメント | 役割 |
-|---------|------|
-| `pro-plan-202605.md` | 戦略・意思決定の経緯と根拠 |
-| **本ドキュメント（pro-plan-prd-202605.md）** | PRD の親、全体像と各PRDへのリンク |
-| `pro-plan-prd/*.md` | 機能ごとの詳細 PRD |
+| ドキュメント | 役割 | 対象読者 |
+|---------|------|------|
+| `pro-plan-202605.md` | 戦略・意思決定の経緯と根拠 | 自分（後で振り返る）、ビジネス判断 |
+| **本ドキュメント（pro-plan-prd-202605.md）** | PRD/Design Doc 親、全体像とリンク | 全関係者 |
+| `pro-plan-prd/*.md` | **PRD（要件）**: 何を / なぜ作るか、ユーザーストーリー、機能要件 | プロダクト全般 |
+| `pro-plan-design/*.md` | **Design Doc（技術設計）**: どう作るか、データモデル、API、コード例 | エンジニア |
 
 ---
 
@@ -40,21 +41,31 @@
 
 ---
 
-## PRD ファイル一覧
+## ドキュメント一覧
+
+### PRD（要件: 何を / なぜ作るか）
 
 | # | PRD ファイル | 内容 | 作成状態 |
 |---|---------|------|------|
-| 01 | [01-system-architecture.md](./pro-plan-prd/01-system-architecture.md) | システムアーキテクチャ全体 | 🟢 作成済み |
-| 02 | [02-payment-flow.md](./pro-plan-prd/02-payment-flow.md) | 課金フロー（iOS IAP + Web Stripe + RevenueCat） | 🟢 作成済み |
-| 03 | 03-pro-feature-shadow-swing.md | 素振りカウンター | ⚪ 実装直前に作成 |
-| 04 | 04-pro-feature-grass.md | GitHub 草機能 | ⚪ 実装直前に作成 |
-| 05 | 05-pro-feature-practice-log.md | 練習記録機能 | ⚪ 実装直前に作成 |
-| 06 | 06-pro-feature-graph.md | シーズン跨ぎ成績推移グラフ | ⚪ 実装直前に作成 |
-| 07 | 07-pro-feature-goal.md | 目標設定 + 達成管理 | ⚪ 実装直前に作成 |
-| 08 | 08-pro-feature-schedule.md | 自主練スケジュール + リマインド | ⚪ 実装直前に作成 |
-| 09 | 09-pro-feature-baseball-note-ext.md | 野球ノート拡張（画像・動画） | ⚪ 実装直前に作成 |
-| 10 | 10-mobile-admob.md | mobile AdMob 実装 | ⚪ 実装直前に作成 |
+| 01 | [01-system-architecture.md](./pro-plan-prd/01-system-architecture.md) | システムアーキテクチャ要件 | 🟢 作成済み |
+| 02 | [02-payment-flow.md](./pro-plan-prd/02-payment-flow.md) | 課金フロー要件 | 🟢 作成済み |
+| 03 | 03-pro-feature-shadow-swing.md | 素振りカウンター要件 | 🟢 ドラフト |
+| 04 | 04-pro-feature-grass.md | GitHub 草機能要件 | 🟢 ドラフト |
+| 05 | 05-pro-feature-practice-log.md | 練習記録機能要件 | 🟢 ドラフト |
+| 06 | 06-pro-feature-graph.md | シーズン跨ぎ成績推移グラフ要件 | 🟢 ドラフト |
+| 07 | 07-pro-feature-goal.md | 目標設定 + 達成管理要件 | 🟢 ドラフト |
+| 08 | 08-pro-feature-schedule.md | 自主練スケジュール要件 | 🟢 ドラフト |
+| 09 | 09-pro-feature-baseball-note-ext.md | 野球ノート拡張要件 | 🟢 ドラフト |
+| 10 | 10-mobile-admob.md | mobile AdMob 要件 | 🟢 ドラフト |
 | 11 | 11-release-checklist.md | リリースチェックリスト | ⚪ リリース直前に作成 |
+
+### Design Doc（技術設計: どう作るか）
+
+| # | Design Doc ファイル | 内容 | 作成状態 |
+|---|---------|------|------|
+| 01 | [01-system-architecture.md](./pro-plan-design/01-system-architecture.md) | システムアーキテクチャ設計 | 🟢 作成済み |
+| 02 | [02-payment-flow.md](./pro-plan-design/02-payment-flow.md) | 課金フロー設計 | 🟢 作成済み |
+| 03〜 | （各 Pro 機能の Design Doc） | - | ⚪ 実装直前に作成 |
 
 ---
 
