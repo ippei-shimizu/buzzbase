@@ -53,6 +53,20 @@ APIのベースパス: `/api/v1/`
   - OK: `feature/93-private-account`, `feature/issue-93-private-account`
   - NG: `feature/#93-private-account`
 
+### PR のマージ先（base）はリポジトリごとに規定する
+
+ユーザーから明示指示がない限り、以下の base ブランチに向けて PR を作成する。front / back は本番(main)前に stg で動作確認するリリースフローのため、新規 PR は必ず stg に向ける。mobile / ルートは main 直接運用。
+
+| リポジトリ | PR base（指示なし時） |
+| ---- | ---- |
+| `ippei-shimizu/buzzbase` | `main` |
+| `ippei-shimizu/buzzbase_front` | `stg` |
+| `ippei-shimizu/buzzbase_back` | `stg` |
+| `ippei-shimizu/buzzbase_mobile` | `main` |
+
+- `gh pr create --base <table-value> ...` をリポジトリ別に切り替える
+- ユーザーが「main に向けて」「develop に向けて」等と明示した場合はそれに従う
+
 ## Sentry運用ルール
 
 エラー監視はSentry（無料 Developerプラン）。GitHub Integration有効化済み。
