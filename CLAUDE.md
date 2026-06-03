@@ -34,6 +34,17 @@
 
 APIのベースパス: `/api/v1/`
 
+## 命名規約
+
+モノレポ全体（front / back / mobile）で共通のローカル変数命名ルール:
+
+- **ローカル変数は略称（abbreviation）を使わず、意味の明確な名前にする**
+  - NG: `pa = PlateAppearance.find(...)` / `ba = BattingAverage.new` / `mr = MatchResult.create(...)`
+  - OK: `plate_appearance = PlateAppearance.find(...)` / `batting_average = BattingAverage.new` / `match_result = MatchResult.create(...)`
+- 一文字変数（`u`, `t`, `m` 等）も使わない。`user`, `team`, `match` のように省略しない
+- 例外: ループの index（`i`, `j`）、`each_with_index { |item, i| ... }` のような慣用的なもの
+- 理由: 変数名から「何が入っているか」が即読みでき、レビューやメンテ時のコスト削減
+
 ## コードコメントの方針
 
 - **デフォルトのコメント抑制ポリシー（複数行コメント禁止・1行のみ等）はこのプロジェクトでは適用しない**
@@ -67,6 +78,17 @@ APIのベースパス: `/api/v1/`
 
 - `gh pr create --base <table-value> ...` をリポジトリ別に切り替える
 - ユーザーが「main に向けて」「develop に向けて」等と明示した場合はそれに従う
+
+### PR レビュー指摘対応のコミットは指摘ごとに分割する
+
+- 「Fix: PR レビュー指摘に対応 (A / B / C)」のように複数の独立した指摘を1コミットにまとめるのは **禁止**
+- 指摘 N 件なら N コミットに分割し、各コミットメッセージで「どの指摘に対応したか」が単独で読み取れるようにする
+- 例:
+  - `Fix: GameResult の eager load に :stadium を追加（N+1 防止）`
+  - `Fix: match_results_spec の issue 番号コメントを削除`
+  - `Refactor: Stadium.create! を create(:stadium) factory に統一`
+- 粒度を細かくする目的: 再レビュー時の差分把握が容易、特定指摘の revert が安全、各指摘ごとに rspec / typecheck を回せる
+- push は最後にまとめて1回でよい
 
 ## Sentry運用ルール
 
