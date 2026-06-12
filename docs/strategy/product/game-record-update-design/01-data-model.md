@@ -22,21 +22,18 @@ erDiagram
     match_results }o--o| stadiums : "belongs to (optional, NEW)"
 
     plate_appearances }o--|| plate_results : "belongs to"
-    plate_appearances }o--|| hit_directions : "belongs to"
     plate_appearances }o--o| contact_qualities : "belongs to (NEW, optional)"
     plate_appearances }o--o| timings : "belongs to (NEW, optional)"
     plate_appearances }o--o| pitch_types : "belongs to (NEW, optional)"
-    plate_appearances }o--o| hit_depths : "belongs to (NEW, optional)"
 
     stadiums }o--o| prefectures : "belongs to (optional)"
     stadiums }o--o| users : "created_by_user (optional)"
-
-    hit_directions ||--o| hit_directions : "zone_polygon (NEW column)"
 ```
 
 **変更点ハイライト**:
-- 新規テーブル: `stadiums`, `pitch_types`, `contact_qualities`, `timings`, `hit_depths`
-- 拡張: `plate_appearances`（多数のカラム追加）/ `match_results.stadium_id` / `hit_directions.zone_polygon`
+- 新規テーブル: `stadiums`, `pitch_types`, `contact_qualities`, `timings`
+- 拡張: `plate_appearances`（多数のカラム追加）/ `match_results.stadium_id`
+- 打球方向 (`hit_direction_id`) は `plate_appearances` の素の integer 列で保存し、id→name は `Stats::HitDirectionAggregator::DIRECTION_LABELS` 定数で管理（マスタテーブル無し）
 - 既存テーブル削除・カラム削除なし
 
 ---
@@ -67,7 +64,6 @@ class AddColumnsToPlateAppearances < ActiveRecord::Migration[7.1]
     add_reference :plate_appearances, :contact_quality, foreign_key: true, null: true, index: true
     add_reference :plate_appearances, :timing, foreign_key: true, null: true, index: true
     add_reference :plate_appearances, :pitch_type, foreign_key: true, null: true, index: true
-    add_reference :plate_appearances, :hit_depth, foreign_key: true, null: true, index: true
 
     add_column :plate_appearances, :self_analysis_memo, :text
     add_column :plate_appearances, :opponent_memo, :text
@@ -97,7 +93,6 @@ end
 | `contact_quality_id` | bigint | YES | NULL | FK → contact_qualities |
 | `timing_id` | bigint | YES | NULL | FK → timings |
 | `pitch_type_id` | bigint | YES | NULL | FK → pitch_types |
-| `hit_depth_id` | bigint | YES | NULL | FK → hit_depths |
 | `self_analysis_memo` | text | YES | NULL | 自己分析メモ |
 | `opponent_memo` | text | YES | NULL | 対戦相手・配球メモ |
 | `hit_location_x` | decimal(5,4) | YES | NULL | 正規化座標 0.0000-1.0000 |
@@ -117,21 +112,6 @@ class AddStadiumIdToMatchResults < ActiveRecord::Migration[7.1]
   end
 end
 ```
-
-#### 2.1.3 `hit_directions` にゾーン定義追加
-
-```ruby
-class AddZonePolygonToHitDirections < ActiveRecord::Migration[7.1]
-  def change
-    add_column :hit_directions, :zone_polygon, :jsonb
-    add_index :hit_directions, :zone_polygon, using: :gin
-  end
-end
-```
-
-- `zone_polygon` には正規化座標の多角形点列を JSON で保存
-- 例: `[{"x": 0.0, "y": 0.6}, {"x": 0.3, "y": 0.6}, {"x": 0.3, "y": 1.0}, {"x": 0.0, "y": 1.0}]`
-- 既存13方向のレコードに対し、data migration で初期値を投入（`docs/strategy/product/game-record-update-design/03-ground-zones.md` 参照）
 
 ### 2.2 新規マスタテーブル
 
@@ -236,29 +216,6 @@ end
 | 2 | 泳ぎ気味 | 2 |
 | 3 | 遅れ気味 | 3 |
 
-#### 2.2.5 `hit_depths`
-
-```ruby
-class CreateHitDepths < ActiveRecord::Migration[7.1]
-  def change
-    create_table :hit_depths do |t|
-      t.string :name, null: false
-      t.integer :display_order, null: false, default: 0
-      t.timestamps
-    end
-    add_index :hit_depths, :display_order
-  end
-end
-```
-
-初期データ:
-
-| id | name | display_order |
-|----|------|---------------|
-| 1 | 内野 | 1 |
-| 2 | 外野 | 2 |
-| 3 | フェンス際 | 3 |
-
 ---
 
 ## 3. Enum 定義（Rails モデル）
@@ -272,7 +229,6 @@ class PlateAppearance < ApplicationRecord
   belongs_to :contact_quality, optional: true
   belongs_to :timing, optional: true
   belongs_to :pitch_type, optional: true
-  belongs_to :hit_depth, optional: true
 
   enum out_type: {
     ground_out: 1,
@@ -353,14 +309,11 @@ end
 | `plate_appearances` | `contact_quality_id` | 打球の質分析 |
 | `plate_appearances` | `timing_id` | タイミング分析 |
 | `plate_appearances` | `pitch_type_id` | 球種別分析 |
-| `plate_appearances` | `hit_depth_id` | 深さ分析 |
 | `match_results` | `stadium_id` | 球場別分析 |
-| `hit_directions` | `zone_polygon` (GIN) | ゾーン判定（将来用） |
 | `stadiums` | `name` | 検索 |
 | `pitch_types` | `display_order` | 表示順 |
 | `contact_qualities` | `display_order` | 表示順 |
 | `timings` | `display_order` | 表示順 |
-| `hit_depths` | `display_order` | 表示順 |
 
 ### 4.3 検討中（必要に応じ後追い追加）
 
@@ -439,12 +392,9 @@ end
 2. 20260520_create_pitch_types.rb
 3. 20260520_create_contact_qualities.rb
 4. 20260520_create_timings.rb
-5. 20260520_create_hit_depths.rb
-6. 20260520_add_zone_polygon_to_hit_directions.rb
-7. 20260520_add_stadium_id_to_match_results.rb
-8. 20260520_add_columns_to_plate_appearances.rb
-9. 20260520_seed_master_data.rb (data-only migration)
-10. 20260520_seed_hit_direction_zones.rb (data-only migration)
+5. 20260520_add_stadium_id_to_match_results.rb
+6. 20260520_add_columns_to_plate_appearances.rb
+7. 20260520_seed_master_data.rb (data-only migration)
 ```
 
 すべて非破壊（カラム追加・新規テーブル作成・データ投入のみ）。
@@ -496,7 +446,7 @@ RSpec.describe '既存データ保全' do
       # ...
     end
 
-    it '既存 plate_results / hit_directions のID/nameが保持される' do
+    it '既存 plate_results のID/nameが保持される' do
       # ...
     end
   end

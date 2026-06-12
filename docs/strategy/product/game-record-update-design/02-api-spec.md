@@ -35,10 +35,6 @@ namespace :v2 do
   resources :pitch_types, only: %i[index]
   resources :contact_qualities, only: %i[index]
   resources :timings, only: %i[index]
-  resources :hit_depths, only: %i[index]
-
-  # hit_directions: 既存 stats#hit_directions と区別するため masters 名前空間
-  resources :hit_directions, only: %i[index]
 
   # 分析API（無料/Pro 共通エンドポイント、内部で認可ガード）
   resource :stats, only: [], controller: 'stats' do
@@ -55,8 +51,6 @@ namespace :v2 do
     get :in_scoring_position, on: :member        # B-1
 
     # 新規: Pro
-    get :hit_depths, on: :member                 # A-3
-    get :hit_type_depth_matrix, on: :member      # A-4
     get :first_pitch_swing, on: :member          # B-2
     get :ahead_in_count, on: :member             # B-3
     get :behind_in_count, on: :member            # B-4
@@ -108,7 +102,6 @@ end
     "contact_quality_id": 1,
     "timing_id": 1,
     "pitch_type_id": 5,
-    "hit_depth_id": 2,
     "self_analysis_memo": "外角低めをうまく逆方向へ",
     "opponent_memo": "右投手、スライダー多め"
   }
@@ -148,7 +141,6 @@ end
   "contact_quality": { "id": 1, "name": "真芯" },
   "timing": { "id": 1, "name": "ドンピシャ" },
   "pitch_type": { "id": 5, "name": "スライダー系" },
-  "hit_depth": { "id": 2, "name": "外野" },
   "self_analysis_memo": "外角低めをうまく逆方向へ",
   "opponent_memo": "右投手、スライダー多め",
   "created_at": "2026-05-17T12:34:56Z",
@@ -283,35 +275,11 @@ end
 
 `display_order` 昇順で返却。
 
-### 4.4 GET `/api/v2/contact_qualities` / `/api/v2/timings` / `/api/v2/hit_depths`
+### 4.4 GET `/api/v2/contact_qualities` / `/api/v2/timings`
 
 同様のフォーマット。各マスタの全件を `display_order` 昇順で返却。
 
-### 4.5 GET `/api/v2/hit_directions`
-
-**ゾーン定義込み** で返却。新規UIの「タップ座標 → 方向ID 自動判定」用。
-
-**認証**: 必須
-
-**レスポンス**:
-```json
-{
-  "hit_directions": [
-    {
-      "id": 1,
-      "name": "投",
-      "zone_polygon": [
-        { "x": 0.45, "y": 0.30 },
-        { "x": 0.55, "y": 0.30 },
-        { "x": 0.55, "y": 0.50 },
-        { "x": 0.45, "y": 0.50 }
-      ]
-    }
-  ]
-}
-```
-
-**注意**: 既存の `/api/v2/stats/hit_directions` （分析API）と区別する。
+打球方向 (13方向) は DB マスタを持たず、`Stats::HitDirectionAggregator::DIRECTION_LABELS` 定数と mobile 側ハードコード (`mobile/constants/groundCanvas.ts`) で SSoT を維持する。分析用に `/api/v2/stats/hit_directions` は別途存在する。
 
 ---
 
@@ -366,39 +334,7 @@ end
 }
 ```
 
-### 5.4 Pro: GET `/api/v2/stats/hit_depths`（A-3 深さ分析）
-
-**認証**: 必須 / Pro: 必要
-
-**レスポンス**:
-```json
-{
-  "results": [
-    { "hit_depth": { "id": 1, "name": "内野" }, "at_bats": 10, "hits": 2 },
-    { "hit_depth": { "id": 2, "name": "外野" }, "at_bats": 30, "hits": 12 },
-    { "hit_depth": { "id": 3, "name": "フェンス際" }, "at_bats": 5, "hits": 4 }
-  ]
-}
-```
-
-### 5.5 Pro: GET `/api/v2/stats/hit_type_depth_matrix`（A-4 クロスマトリクス）
-
-**レスポンス**:
-```json
-{
-  "matrix": [
-    {
-      "hit_type": "ground_out",
-      "by_depth": [
-        { "depth_id": 1, "count": 8 },
-        { "depth_id": 2, "count": 4 }
-      ]
-    }
-  ]
-}
-```
-
-### 5.6 Pro: GET `/api/v2/stats/first_pitch_swing`（B-2 初球打率）
+### 5.4 Pro: GET `/api/v2/stats/first_pitch_swing`（B-2 初球打率）
 
 **レスポンス**:
 ```json
@@ -416,19 +352,19 @@ end
 }
 ```
 
-### 5.7 Pro: GET `/api/v2/stats/ahead_in_count`（B-3 ボール先行時打率）
+### 5.5 Pro: GET `/api/v2/stats/ahead_in_count`（B-3 ボール先行時打率）
 
 判定: `final_balls > final_strikes`
 
 **レスポンス**: B-2 と同形式
 
-### 5.8 Pro: GET `/api/v2/stats/behind_in_count`（B-4 追い込まれ打率）
+### 5.6 Pro: GET `/api/v2/stats/behind_in_count`（B-4 追い込まれ打率）
 
 判定: `final_strikes = 2`
 
 **レスポンス**: B-2 と同形式
 
-### 5.9 Pro: GET `/api/v2/stats/contact_qualities`（C-1 打球の質グラフ）
+### 5.7 Pro: GET `/api/v2/stats/contact_qualities`（C-1 打球の質グラフ）
 
 **レスポンス**:
 ```json
@@ -445,15 +381,15 @@ end
 }
 ```
 
-### 5.10 Pro: GET `/api/v2/stats/timings`（C-2 タイミンググラフ）
+### 5.8 Pro: GET `/api/v2/stats/timings`（C-2 タイミンググラフ）
 
 C-1 と同形式（マスタが timings になる）。
 
-### 5.11 Pro: GET `/api/v2/stats/contact_quality_results`（C-3 クロス）
+### 5.9 Pro: GET `/api/v2/stats/contact_quality_results`（C-3 クロス）
 
 打球の質×結果のクロス集計。詳細フォーマットは実装時に確定。
 
-### 5.12 Pro: GET `/api/v2/stats/go_ao_ratio`（D-2 GO/AO比率）
+### 5.10 Pro: GET `/api/v2/stats/go_ao_ratio`（D-2 GO/AO比率）
 
 **レスポンス**:
 ```json
@@ -466,7 +402,7 @@ C-1 と同形式（マスタが timings になる）。
 
 `air_outs` = `fly_out` + `line_out` + `foul_fly`
 
-### 5.13 Pro: GET `/api/v2/stats/pitch_types`（E-1 球種別打率）
+### 5.11 Pro: GET `/api/v2/stats/pitch_types`（E-1 球種別打率）
 
 **レスポンス**:
 ```json
@@ -483,7 +419,7 @@ C-1 と同形式（マスタが timings になる）。
 }
 ```
 
-### 5.14 Pro: GET `/api/v2/stats/pitch_type_directions`（E-2 球種別打球分布）
+### 5.12 Pro: GET `/api/v2/stats/pitch_type_directions`（E-2 球種別打球分布）
 
 球種ごとの打球方向ヒートマップ用データ。
 
@@ -502,7 +438,7 @@ C-1 と同形式（マスタが timings になる）。
 }
 ```
 
-### 5.15 Pro: GET `/api/v2/stats/innings`（F-1 イニング別打率）
+### 5.13 Pro: GET `/api/v2/stats/innings`（F-1 イニング別打率）
 
 **レスポンス**:
 ```json
@@ -514,7 +450,7 @@ C-1 と同形式（マスタが timings になる）。
 }
 ```
 
-### 5.16 Pro: GET `/api/v2/stats/stadiums`（F-2 球場別成績）
+### 5.14 Pro: GET `/api/v2/stats/stadiums`（F-2 球場別成績）
 
 **レスポンス**: 2試合以上の球場のみ返却
 
@@ -546,7 +482,6 @@ module Api
   module V2
     class StatsController < ApplicationController
       PRO_ACTIONS = %i[
-        hit_depths hit_type_depth_matrix
         first_pitch_swing ahead_in_count behind_in_count
         contact_qualities timings contact_quality_results
         go_ao_ratio pitch_types pitch_type_directions
@@ -599,14 +534,12 @@ module V2
     has_one :contact_quality, serializer: V2::ContactQualitySerializer
     has_one :timing, serializer: V2::TimingSerializer
     has_one :pitch_type, serializer: V2::PitchTypeSerializer
-    has_one :hit_depth, serializer: V2::HitDepthSerializer
 
     # 「詳細未入力」バッジ判定用
     def has_detail_data
       object.contact_quality_id.present? ||
         object.timing_id.present? ||
         object.pitch_type_id.present? ||
-        object.hit_depth_id.present? ||
         object.final_balls.present? ||
         object.first_pitch_swing.present? ||
         object.runners_state.present? ||
@@ -637,14 +570,6 @@ module V2
 
   class TimingSerializer < ActiveModel::Serializer
     attributes :id, :name, :display_order
-  end
-
-  class HitDepthSerializer < ActiveModel::Serializer
-    attributes :id, :name, :display_order
-  end
-
-  class HitDirectionSerializer < ActiveModel::Serializer
-    attributes :id, :name, :zone_polygon
   end
 end
 ```
@@ -719,7 +644,7 @@ end
 
 - v2 エンドポイント追加によって v1 の挙動が変わらないこと
 - v2 で打席を保存しても、既存 `batting_average` レコードを **改変しない**（既存試合のみ）
-- マスタAPIは新規追加のみで既存マスタ（`plate_results`, `hit_directions`）の値を変えない
+- マスタAPIは新規追加のみで既存マスタ（`plate_results` など）の値を変えない
 
 ### RSpec 例
 
