@@ -1,7 +1,7 @@
 # 04. mobile UI ワイヤーフレーム
 
 **親ドキュメント**: `../game-record-update-design-doc.md`
-**前提**: `01-data-model.md`, `02-api-spec.md`, `03-ground-zones.md`
+**前提**: `01-data-model.md`, `02-api-spec.md`
 **関連 Issue**: #332, #333, #334, #335, #336
 
 ---
@@ -384,7 +384,6 @@ interface BattingRecordState {
     outType: OutType | null;
     hitType: HitType | null;
     hitDirectionId: number | null;
-    hitDepthId: number | null;
     hitLocationX: number | null;
     hitLocationY: number | null;
     rbi: number;

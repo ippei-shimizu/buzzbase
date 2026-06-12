@@ -92,7 +92,6 @@ inning                   # 何回 (integer, 任意)
 contact_quality_id       # 打球の質マスタID
 timing_id                # タイミングマスタID
 pitch_type_id            # 最後に打った球種マスタID
-hit_depth_id             # 打球の深さマスタID
 self_analysis_memo       # 自己分析メモ (text)
 opponent_memo            # 対戦相手・配球メモ (text)
 
@@ -178,21 +177,13 @@ id, name, display_order
 
 初期データ: ドンピシャ / 泳ぎ気味 / 遅れ気味
 
-#### `hit_depths`（打球の深さ）
-
-```
-id, name, display_order
-```
-
-初期データ: 内野 / 外野 / フェンス際
-
 ### 3.3 既存マスタの扱い
 
-#### `hit_directions`（既存・13方向）
+#### 打球方向（13方向、コード定数で管理）
 
-- 既存の13方向（投/捕/一/二/三/遊/左線/左/左中/中/右中/右/右線）を維持
-- 新カラム `zone_polygon` (jsonb) を追加し、各方向のグラウンド上のゾーン定義を持つ
-- タップ座標 (`hit_location_x`, `hit_location_y`) からゾーンを判定し `hit_direction_id` を自動算出する
+- 13方向（投/捕/一/二/三/遊/左線/左/左中/中/右中/右/右線）の id→name は `Stats::HitDirectionAggregator::DIRECTION_LABELS` を SSoT として管理する（DB マスタテーブルは持たない）
+- mobile はタップ座標から `mobile/constants/groundCanvas.ts` の `DIRECTION_LABEL_POSITIONS` との距離計算で `hit_direction_id` を導出する
+- `plate_appearances.hit_direction_id` は素の integer 列で保存
 
 #### `plate_results`（既存）
 
@@ -327,17 +318,16 @@ id, name, display_order
 
 ---
 
-## 6. グラウンドのゾーン定義
+## 6. 打球方向判定と座標系
 
-### 6.1 構造
+### 6.1 判定方法
 
-- 内野6方向（深さなし）+ 外野7方向 × 深さ3層（内野超え / 外野 / フェンス際）= **27ゾーン**
 - 打球位置は正規化座標 (`hit_location_x`, `hit_location_y`) で保存
-- ゾーン判定: `hit_directions.zone_polygon` の多角形定義から自動算出
+- mobile はタップ座標と `DIRECTION_LABEL_POSITIONS` (13方向のラベル中心)との距離計算で `hit_direction_id` (1〜13) を導出する
 
 ### 6.2 座標系
 
-- 正規化座標 (0.0〜1.0) で保存
+- 正規化座標 (0.0〜1.0) で保存（mobile キャンバス 420×340 px を基準にスケール）
 - 球場イラスト差し替え時の互換性を担保
 
 ---
@@ -352,8 +342,6 @@ id, name, display_order
 |---|------|------|--------|
 | A-1 | 打球分布図（詳細） | 絶対座標でプロット、色分け | 無料 |
 | A-2 | 打球方向別結果 | 13方向の打率・打数・安打数・長打率 | 無料 |
-| A-3 | 打球の深さ分析 | 内野/外野/フェンス際の結果分布 | Pro |
-| A-4 | 打球種類×深さマトリクス | ゴロ/フライ/ライナー × 深さのヒートマップ | Pro |
 
 #### B. 状況別打率系
 
@@ -415,8 +403,6 @@ id, name, display_order
 - `GET /api/v2/pitch_types` - 球種マスタ
 - `GET /api/v2/contact_qualities` - 打球の質マスタ
 - `GET /api/v2/timings` - タイミングマスタ
-- `GET /api/v2/hit_depths` - 打球の深さマスタ
-- `GET /api/v2/hit_directions` - ゾーン定義込みで返却
 
 ### 8.3 分析API（Pro機能ガード）
 
@@ -432,12 +418,11 @@ id, name, display_order
 
 ### 9.1 マイグレーション順序
 
-1. **新規マスタテーブル作成**: `stadiums`, `pitch_types`, `contact_qualities`, `timings`, `hit_depths`
+1. **新規マスタテーブル作成**: `stadiums`, `pitch_types`, `contact_qualities`, `timings`
 2. **初期マスタデータ投入**: 各マスタの初期値（seed or migration）
-3. **`hit_directions` に `zone_polygon` カラム追加 + 既存13方向のゾーン定義投入**
-4. **`plate_appearances` に新カラム追加**（すべて nullable）
-5. **`match_results` に `stadium_id` 追加**（nullable）
-6. **`batting_average` の after_commit 自動再計算ロジック追加**
+3. **`plate_appearances` に新カラム追加**（すべて nullable）
+4. **`match_results` に `stadium_id` 追加**（nullable）
+5. **`batting_average` の after_commit 自動再計算ロジック追加**
 
 ### 9.2 既存データへの影響
 
@@ -463,7 +448,7 @@ id, name, display_order
 
 - [ ] **マイグレーション前後で件数差分ゼロ**: `plate_appearances`, `batting_average`, `pitching_result`, `match_results`, `game_results` の各テーブルでレコード件数が変わらない
 - [ ] **既存集計値の不変性**: 既存ユーザーの `batting_average` の主要カラム（`at_bats`, `hit`, `two_base_hit`, `three_base_hit`, `home_run`, `total_bases`, `runs_batted_in`, `strike_out`, `base_on_balls`, `hit_by_pitch`, `sacrifice_hit`, `sacrifice_fly`, `stealing_base`, `caught_stealing`, `error`）の値がマイグレーション前後で変わらない
-- [ ] **既存マスタIDの保持**: `plate_results`, `hit_directions`, `batting_positions` の既存IDがすべて維持されている（走塁妨害=18, 併殺打=19, ファールフライ=3 など）
+- [ ] **既存マスタIDの保持**: `plate_results`, `batting_positions` の既存IDがすべて維持されている（走塁妨害=18, 併殺打=19, ファールフライ=3 など）。打球方向 (1〜13) は `Stats::HitDirectionAggregator::DIRECTION_LABELS` 定数で保持
 - [ ] **既存表示の変化なし**: 既存試合（打席詳細なし）が試合一覧・試合詳細・ランキングで従来通り表示される（特に `batting_result` 文字列カラムの既存値）
 - [ ] **after_commit 自動再計算の安全性**: 新仕様で打席保存時に `batting_average` を再計算する際、既存試合（打席詳細なし）の集計値は **再計算対象から除外** する（または再計算しても同じ値になることを保証する）
 - [ ] **ロールバック可能性**: マイグレーションは `db:rollback` で安全に戻せる（カラム追加・マスタテーブル追加のみで破壊的変更なし）
@@ -481,7 +466,6 @@ id, name, display_order
 |---------|-----------|-------------|
 | `plate_appearances` カラム追加 | 既存レコードのカラム値破壊 | 新カラムはすべて nullable で追加、デフォルト値で既存値書換しない |
 | `batting_average` 再計算ロジック | 既存集計値の改変 | 既存試合（打席詳細なし）は再計算対象から除外、新仕様試合のみ対象 |
-| `hit_directions` に `zone_polygon` 追加 | 既存方向IDの混乱 | 既存ID/nameは保持、`zone_polygon` のみ追加 |
 | 既存 `plate_result_id` の選択肢非表示 | 既存データの表示崩れ | 既存IDは残し、フォームUI上でのみ非表示制御 |
 | `match_results` に `stadium_id` 追加 | 既存試合の必須化トラブル | nullable で追加、既存試合は NULL のまま |
 
@@ -528,7 +512,7 @@ id, name, display_order
 5. **mobile 打席記録 詳細**: 詳細データ入力UI（任意項目）
 6. **mobile 打席編集**: 試合詳細・打席編集・削除
 7. **mobile 分析機能（無料）**: A-1, A-2, B-1, D-1 の拡張
-8. **mobile 分析機能（Pro）**: A-3, A-4, B-2〜B-4, C-1〜C-3, D-2, E-1, E-2, F-1, F-2
+8. **mobile 分析機能（Pro）**: B-2〜B-4, C-1〜C-3, D-2, E-1, E-2, F-1, F-2
 9. **Web版移植**: 上記すべての web/ への展開（別フェーズ）
 
 ---
@@ -538,7 +522,6 @@ id, name, display_order
 ### 12.1 検討中
 
 - マスタ管理画面（admin での球場・球種の追加・編集）は現時点では含めない
-- グラウンドゾーンの具体的な多角形座標（内野6 + 外野7×深さ3 = 27ゾーン）の定義は `game-record-update-design/03-ground-zones.md` を参照
 - Pro 機能の認可ガード実装方法（既存 Pro PRD 01-system-architecture.md と整合させる）
 
 ### 12.2 後続検討
@@ -583,5 +566,5 @@ id, name, display_order
 
 ### 分析機能のPro/無料切り分け
 - 無料: A-1, A-2, B-1, D-1
-- Pro: A-3, A-4, B-2, B-3, B-4, C-1, C-2, C-3, D-2, E-1, E-2, F-1, F-2
+- Pro: B-2, B-3, B-4, C-1, C-2, C-3, D-2, E-1, E-2, F-1, F-2
 - 削除: ファーストストライク打率
