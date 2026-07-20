@@ -6,6 +6,7 @@
 **親ドキュメント**: `../pro-plan-prd-202605.md`
 **前提PRD**: `01-system-architecture.md`
 **設計**: [`../pro-plan-design/03-ux-information-architecture.md`](../pro-plan-design/03-ux-information-architecture.md) §2〜§5
+**拡張PRD**: [`12-pro-feature-improvement-loop.md`](./12-pro-feature-improvement-loop.md)（課題テーマ紐付け・練習量×成績の相関インサイト＝F-21 の具体化・週次レポート）
 
 ---
 

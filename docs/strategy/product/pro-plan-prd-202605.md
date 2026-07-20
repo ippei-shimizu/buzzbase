@@ -58,6 +58,9 @@
 | 09 | 09-pro-feature-baseball-note-ext.md | 野球ノート拡張要件 | 🟢 ドラフト |
 | 10 | 10-mobile-admob.md | mobile AdMob 要件 | 🟢 ドラフト |
 | 11 | 11-release-checklist.md | リリースチェックリスト | ⚪ リリース直前に作成 |
+| 12 | [12-pro-feature-improvement-loop.md](./pro-plan-prd/12-pro-feature-improvement-loop.md) | 上達ループ拡張（課題テーマ / 相関インサイト / 振り返りテンプレ / 週次レポート） | 🟢 ドラフト |
+
+> PRD-12 は MVP 後の拡張。練習記録（PRD-05）・野球ノート（PRD-09）を「課題→練習→検証→次へ」の上達ループに束ねる4機能を一括管理する。
 
 ### Design Doc（技術設計: どう作るか）
 
