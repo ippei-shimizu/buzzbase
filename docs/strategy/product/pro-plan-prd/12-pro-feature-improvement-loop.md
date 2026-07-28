@@ -245,15 +245,16 @@ end
 
 - 生成は `GeneratePeriodicReviewJob`（週次: 毎週月曜早朝 / 月次: 月初早朝、JST）。集計は `activity_logs`・`practice_sessions`・`condition_logs`・成績集計・`improvement_themes` を横断。
 
-## 無料 / Pro
+## 無料 / Pro（実装確定: 2026-07-27）
 
 | 項目 | 無料 | Pro |
 |----|----|----|
-| 週次レポート（基本: 量・Streak・練習日数） | ◎ | ◎ |
+| 週次レポート（基本サマリー含む） | × | ◎ |
 | 課題別内訳・相関インサイト・成績前週比・次の一手 | × | ◎ |
 | 月次レポート | × | ◎ |
 
-> 無料でも「がんばりの承認」までは返して継続を支え、**分析・示唆パート**を Pro レバーにする。
+> 週次/月次レポートは基本サマリーを含め完全に Pro 限定機能とする。無料ユーザーには一件も返さない（`PeriodicReviewsController`）。
+> `PeriodicReviewSerializer` の `basic_summary` / `advanced_summary` の分離は、将来 Pro 内でのプラン差別化に備えた構造であり、現時点の無料/Pro境界とは無関係。
 
 ---
 
