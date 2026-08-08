@@ -45,6 +45,20 @@ buzzbaseリポジトリにissueを作成し、GitHub Projects "BUZZ BASE" に自
 
 ---
 
+### `/request-claude-review` — @claude コードレビュー依頼
+
+PRの差分を分析し、重点観点を明記した `@claude` メンションのコメントを投稿してGitHub ActionsのClaude Codeレビューを起動。ワークフローが起動したことまで確認する。
+
+```
+/request-claude-review https://github.com/ippei-shimizu/buzzbase_back/pull/335
+/request-claude-review 335
+/request-claude-review 335 N+1とマイグレーションの非可逆性を重点的に
+```
+
+トリガー: 「PRにレビュー依頼して」「@claudeでレビューお願いして」
+
+---
+
 ### `/start-worktree` — Git Worktree + 開発環境セットアップ
 
 issue番号からgit worktreeを作成。front/backサブモジュールのworktree作成、ブランチ作成、.envコピー、Docker Compose起動まで一括実行。
