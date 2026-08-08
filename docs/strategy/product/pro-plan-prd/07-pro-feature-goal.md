@@ -6,6 +6,7 @@
 **親ドキュメント**: `../pro-plan-prd-202605.md`
 **前提PRD**: `01-system-architecture.md`
 **設計**: [`../pro-plan-design/03-ux-information-architecture.md`](../pro-plan-design/03-ux-information-architecture.md) §1, §7
+**関連PRD**: [`12-pro-feature-improvement-loop.md`](./12-pro-feature-improvement-loop.md)（課題テーマは短期の技術フォーカス、目標は到達値。将来レポート統合の余地あり）
 
 ---
 
