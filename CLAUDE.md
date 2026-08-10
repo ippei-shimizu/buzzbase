@@ -60,7 +60,8 @@ APIのベースパス: `/api/v1/`
 - フォーマット: `[Type]: [説明]`（例: `Add: 試合結果の絞り込み機能を追加`）
 - Type: `Add`, `Fix`, `Update`, `Change`, `Refactor`, `Remove`, `Test`, `Chore`, `Docs`
 - サブモジュール更新コミット: `Fix: サブプロジェクトのコミットIDを更新`
-- **mainブランチへの直push・直commit・mergeは絶対にしない**（サブモジュールのリポジトリも同様）
+- **ルートリポジトリ（`ippei-shimizu/buzzbase`）は例外的にmainブランチへ直接commit・pushしてよい**（ブランチ作成・PR作成は不要）
+- **サブモジュール（front / back / mobile）は引き続きmainブランチへの直push・直commit・mergeを絶対にしない**
 - **ブランチ名に `#` を使用しない**（CI/CDツールとの互換性のため）
   - OK: `feature/93-private-account`, `feature/issue-93-private-account`
   - NG: `feature/#93-private-account`
