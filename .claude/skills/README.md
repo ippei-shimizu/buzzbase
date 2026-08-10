@@ -45,9 +45,9 @@ buzzbaseリポジトリにissueを作成し、GitHub Projects "BUZZ BASE" に自
 
 ---
 
-### `/request-claude-review` — @claude コードレビュー依頼
+### `/request-claude-review` — @claude コードレビュー依頼＋自動対応
 
-PRの差分を分析し、重点観点を明記した `@claude` メンションのコメントを投稿してGitHub ActionsのClaude Codeレビューを起動。ワークフローが起動したことまで確認する。
+PRの差分を分析し、重点観点を明記した `@claude` メンションのコメントを投稿してGitHub ActionsのClaude Codeレビューを起動。レビューが返ってくるまで待機し、指摘内容を確認して対応要否を判断したうえで、修正の実装・コミット（指摘1件につき1コミット）・pushまでを自動で行う（マージはしない）。
 
 ```
 /request-claude-review https://github.com/ippei-shimizu/buzzbase_back/pull/335
@@ -110,3 +110,7 @@ Vercel Engineering によるReact/Next.js パフォーマンス最適化ガイ�
 ### `vercel-composition-patterns`
 
 React コンポジションパターン。コンポーネント設計・リファクタリング時に自動適用。Compound Components、Render Props、Context Providers 等。
+
+### `record-learning`
+
+PRレビュー指摘への対応完了時、またはユーザーが手動修正を伝えたときに学びを抽出し、個人の好み（自動memory）かプロジェクト規約候補かを判定する。同じ指摘が2回目に出た時点でのみCLAUDE.md/`.claude/rules/*.md`への追加をdiffで提案し、承認後に反映する。`/record-learning` で明示的に呼び出すことも可能。詳細: `CLAUDE.md` の「学習ループ」セクション参照。
