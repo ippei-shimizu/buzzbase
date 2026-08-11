@@ -1,8 +1,8 @@
 # Design Doc: 課金フロー
 
 **作成日**: 2026-05-12
-**最終更新**: 2026-05-12（解約・返金・課金失敗フロー、支払い方法、ユーザー通知を追加）
-**Status**: Draft
+**最終更新**: 2026-08-11（release/pro-202605 の実装に合わせて実クラス構成・テーブル定義・価格・Product ID を反映）
+**Status**: Implemented（release/pro-202605）
 **関連 PRD**: [`../pro-plan-prd/02-payment-flow.md`](../pro-plan-prd/02-payment-flow.md)
 **前提 Design Doc**: [`./01-system-architecture.md`](./01-system-architecture.md)
 
@@ -18,9 +18,9 @@ iOS IAP + Web Stripe + RevenueCat を用いた Pro サブスクの課金フロ�
 
 ## Goals
 
-- iOS / Web 両方で安定した課金体験を提供
+- iOS / Android / Web すべてで安定した課金体験を提供
 - Webhook の信頼性を最大化（冪等性、リトライ、順序非依存）
-- 早期特典（30日無料）と通常トライアル（7日無料）を正しく出し分け
+- 通常トライアル（7日無料）を初回加入のユーザーにのみ付与
 - 解約・返金・課金失敗の各フローを正しく処理
 - 監査ログによる課金トラブルの追跡
 - 適切なユーザー通知（解約完了、期限切れ前、課金失敗等）
@@ -29,40 +29,43 @@ iOS IAP + Web Stripe + RevenueCat を用いた Pro サブスクの課金フロ�
 
 ## Non-goals
 
-- Android 課金（Phase 2）
-- プラン変更（月額↔年額）の実装（Phase 2）
-- 解約理由アンケート（Phase 2）
+- 早期特典としての 30日無料トライアルの出し分け（`is_early_subscriber` の記録のみ実装）
+- ファミリープラン・法人プラン
 
 ---
 
 ## Detailed Design
 
-### 1. 加入フロー（iOS IAP）
+### 1. 加入フロー（ストア課金: iOS IAP / Google Play Billing）
 
 ```
 ユーザーが Pro 機能をタップ
         ↓
-Pro 案内モーダル表示
+Pro 案内モーダル（PaywallModal）表示
         ↓
 「Pro に加入する」タップ
         ↓
 react-native-purchases で purchasePackage() 呼び出し
+  （services/revenueCatService.ts が SDK の薄いラッパー。
+    未 configure 時は no-op / null フォールバックで開発環境を壊さない）
         ↓
-StoreKit (iOS IAP) で課金処理
-  - Apple ID 認証（Touch ID / Face ID）
-  - 支払い方法は Apple ID 設定のものを使用
+StoreKit (iOS) / Google Play Billing (Android) で課金処理
+  - 支払い方法はストアアカウント設定のものを使用
         ↓
 RevenueCat に購入情報送信
         ↓
-RevenueCat が back に Webhook 送信
+RevenueCat が back に Webhook 送信（POST /api/v1/webhooks/revenuecat）
         ↓
-Sidekiq が非同期で処理
+Solid Queue の RevenueCatWebhookJob が非同期で処理
         ↓
 subscriptions.status を 'trial' or 'active' に更新
 has_used_trial = true をセット
         ↓
 アプリで Pro 機能解放
 ```
+
+RevenueCat の `app_user_id` は必ず `String(user.id)` を渡す。back の `RevenueCat::UserResolver`
+がこの文字列で User を引くため、ここがずれると課金済みでも entitlement が付与されない。
 
 ### 2. 加入フロー（Web Stripe）
 
@@ -73,34 +76,52 @@ Pro 案内ページ表示
         ↓
 「Pro に加入する」タップ
         ↓
-front から back の POST /api/v1/pro/checkout 呼び出し
+front の Server Action startProCheckout() → back の POST /api/v1/pro/checkout
+  - Flipper :pro_features が無効なら Stripe を呼ばずに 403 feature_disabled
+  - 加入中なら 409 already_subscribed
+  - success_url / cancel_url はサーバー側の APP_URL から組み立てる
+    （クライアント発の origin を受け取ると任意ドメインを差し込まれるため）
         ↓
-back で Stripe Checkout Session 作成
-  - trial_period_days を動的設定（早期/通常）
-  - has_used_trial が true なら trial_period_days = 0
+back で Stripe Checkout Session 作成（App::Stripe::CheckoutSessionBuilder）
+  - TrialDaysCalculator.for(user) で trial_period_days を決定（0 or 7）
+  - 0 のときは trial_period_days キー自体を送らない（compact で除去）
         ↓
 Stripe Checkout URL に redirect
         ↓
-Stripe で決済情報入力（クレカ / Apple Pay / Google Pay）
+Stripe で決済情報入力（決済手段は Stripe ダッシュボード設定に委譲。
+  payment_method_types はコード側で固定しない）
         ↓
-Stripe → RevenueCat → back Webhook で状態更新（非同期）
+[A] Stripe → back の POST /api/v1/webhooks/stripe
+      checkout.session.completed で stripe_customer_id / stripe_subscription_id のみ保存
+[B] Stripe → RevenueCat → back の POST /api/v1/webhooks/revenuecat
+      status / plan_type / expires_at 等の状態遷移はこちらが唯一の信号
         ↓
 Web で Pro 機能解放
 ```
 
+Stripe Webhook は「Stripe ID の紐付け専用」で、状態遷移は担当しない。両者を混ぜると
+二重に status を書き換えて順序依存になるため、責務を分けている。
+
+`checkout.session.completed` の `data.object` は Checkout Session 自体であり、
+`subscription_data.metadata`（Subscription オブジェクト側）とは別物。ハンドラは Session 側の
+`metadata.user_id` を読むため、Session と subscription_data の両方に同じ metadata を渡す必要がある。
+
 ### 3. 解約フロー 🆕
 
-#### iOS（Apple 規約準拠）
+#### ストア課金（iOS / Android。各ストアの規約準拠）
 
 ```
 ユーザー: アプリ内で「Pro解約」タップ
   ↓
-解約方法ガイドモーダル表示
-  「設定 → Apple ID → サブスクリプション → BUZZ BASE Pro → 解約」
+CancelGuideModal 表示（subscription.platform で ios / android を出し分け）
+  ios     : 「設定 → Apple ID → サブスクリプション → BUZZ BASE Pro → 解約」
+            https://apps.apple.com/account/subscriptions
+  android : 「Google Play → お支払いと定期購入 → 定期購入 → BUZZ BASE Pro → 解約」
+            https://play.google.com/store/account/subscriptions
   ↓
-ユーザーが iOS 設定アプリで解約
+ユーザーが各ストアの管理画面で解約
   ↓
-Apple → RevenueCat → back に CANCELLATION Webhook
+Apple / Google → RevenueCat → back に CANCELLATION Webhook
   ↓
 back: subscription.status を 'cancelled' に更新
   - cancelled_at = now
@@ -127,7 +148,8 @@ Pro 機能無効化、無料機能のみ利用可
   ↓
 front から back の DELETE /api/v1/pro/subscription 呼び出し
   ↓
-back: Stripe で subscription.cancel_at_period_end = true を設定
+back: App::Stripe::SubscriptionUpdater#cancel_at_period_end
+  Stripe で subscription.cancel_at_period_end = true を設定（local 状態は触らない）
   ↓
 Stripe → RevenueCat → back に CANCELLATION Webhook
   ↓
@@ -204,16 +226,16 @@ Pro 機能即時利用可能
 
 ### 7. 支払い方法の対応
 
-#### iOS（Apple IAP）
+#### ストア課金（Apple IAP / Google Play Billing）
 
 | 支払い方法 | 対応 |
 |----|----|
-| Apple ID 登録クレカ | ✅ |
-| Apple Pay | ✅ |
+| ストアアカウント登録クレカ | ✅ |
+| Apple Pay / Google Pay | ✅ |
 | キャリア決済（au, docomo, SoftBank） | ✅ |
-| iTunes ギフトカード残高 | ✅ |
+| ギフトカード残高 | ✅ |
 
-→ Apple ID の設定に従う。BUZZ BASE 側で選択させない。
+→ ストアアカウントの設定に従う。BUZZ BASE 側で選択させない。
 
 #### Web（Stripe）
 
@@ -237,20 +259,51 @@ Stripe ダッシュボードで有効化する決済手段:
 
 | Entitlement | 説明 |
 |----------|----|
-| `pro` | Pro 機能の利用権限 |
+| `pro` | Pro 機能の利用権限。`RevenueCat::SubscriberSync::ENTITLEMENT_ID` と一致させる |
+
+Product を Entitlement に紐付け忘れると、購入は成立するのに subscriber レスポンスの
+`entitlements` が空になり Pro が付与されない。RevenueCat 側の設定漏れとして最も踏みやすい。
 
 #### Product
 
-| Product ID | プラットフォーム | 価格 | トライアル |
+Product ID → plan_type / store → platform の対応は back の `RevenueCat::PlanCatalog` が単一ソース。
+
+| Product ID | プラットフォーム | 価格（税込） | トライアル |
 |----------|------------|----|-------|
-| `buzzbase_pro_monthly` | iOS, Web | ¥300 | 7日無料 |
-| `buzzbase_pro_yearly` | iOS, Web | ¥2,980 | 7日無料 |
+| `jp.buzzbase.mobile.pro.monthly` | iOS, Android | ¥480 / 月 | 7日無料 |
+| `jp.buzzbase.mobile.pro.yearly` | iOS, Android | ¥4,800 / 年 | 7日無料 |
+| `ENV['STRIPE_PRODUCT_ID_MONTHLY']` | Web | ¥480 / 月 | 7日無料 |
+| `ENV['STRIPE_PRODUCT_ID_YEARLY']` | Web | ¥4,800 / 年 | 7日無料 |
 
-#### Offer（早期特典）
+Stripe の Product ID は test / live モードで値が変わるため定数化せず ENV で切り替える。
+`PlanCatalog.stripe_plan_type_from` は product_id が blank のとき先に nil を返す
+（ENV 未設定環境では `nil == nil` で誤って monthly と判定してしまうため）。
 
-| Offer ID | 用途 | 期間 |
-|--------|----|----|
-| `early_30days_free` | リリース後7日以内の特典 | 30日無料 |
+| store 値 | platform |
+|----|----|
+| `APP_STORE` / `MAC_APP_STORE` | `ios` |
+| `PLAY_STORE` | `android` |
+| `STRIPE` | `web` |
+
+#### period_type の表記ゆれ（実装時の落とし穴）
+
+同じ `period_type` でもデータソースで表記が異なる。
+
+| データソース | 値の例 |
+|----|----|
+| Webhook ペイロード | `"TRIAL"`（大文字） |
+| REST API `GET /v1/subscribers` | `"trial"`（小文字） |
+
+比較ロジックを各所に散らすと片方だけ取りこぼすため、`RevenueCat::PeriodType.trial?`
+（case-insensitive 比較）に集約し、`WebhookPayload#trial?` と `SubscriberSync` の双方から参照する。
+
+#### Secret API Key のバージョン（実装時の落とし穴）
+
+`RevenueCat::SubscriberClient` は `GET /v1/subscribers/{app_user_id}` を叩くため、
+**V1 の Secret API Key** を `REVENUECAT_SECRET_API_KEY` に設定する。V2 キーを V1 エンドポイントに
+使うと 403 になる（キー種別の取り違えはエラーメッセージから原因が読み取りにくい）。
+設定漏れは一過性障害ではなくデプロイミスなので、`ENV.fetch` でデフォルト値を持たせず
+KeyError で即座に気付けるようにしている。
 
 ### 9. Apple App Store Connect 設定
 
@@ -264,136 +317,96 @@ Stripe ダッシュボードで有効化する決済手段:
 
 | プラン | オファータイプ | 期間 |
 |------|-----------|----|
-| `buzzbase_pro_monthly` | Free Trial | 1 week |
-| `buzzbase_pro_yearly` | Free Trial | 1 week |
+| `jp.buzzbase.mobile.pro.monthly` | Free Trial | 1 week |
+| `jp.buzzbase.mobile.pro.yearly` | Free Trial | 1 week |
 
 #### Promotional Offer（早期特典）
 
-| プラン | オファータイプ | 期間 | 配布方法 |
-|------|-----------|----|----|
-| `buzzbase_pro_monthly` | Free Trial | 1 month | アプリ内で Offer Code 自動付与 |
-| `buzzbase_pro_yearly` | Free Trial | 1 month | 同上 |
+未実装。30日無料の出し分けは見送り、早期加入かどうかは back の `is_early_subscriber`
+フラグとして記録するだけにした（`TrialDaysCalculator.in_early_window?`）。
 
 ### 10. Webhook の冪等性
 
 #### webhook_events テーブル
 
-```ruby
-class CreateWebhookEvents < ActiveRecord::Migration[7.0]
-  def change
-    create_table :webhook_events do |t|
-      t.string :provider, null: false        # 'revenuecat' / 'stripe'
-      t.string :event_id, null: false
-      t.string :event_type, null: false
-      t.json :payload
-      t.datetime :received_at, null: false
-      t.datetime :processed_at
-      t.string :processing_status            # 'pending'/'success'/'failed'
-      t.text :error_message
-      t.timestamps
-    end
-    add_index :webhook_events, [:provider, :event_id], unique: true
-    add_index :webhook_events, :processing_status
-  end
-end
-```
+主要カラム（`provider` は `'revenuecat'` / `'stripe'`）:
+
+| カラム | 用途 |
+|----|----|
+| `provider` + `external_event_id` | 冪等性キー。UNIQUE 制約でプロバイダの再送を吸収する |
+| `event_type` | RevenueCat の `INITIAL_PURCHASE` 等 / Stripe の `checkout.session.completed` 等 |
+| `payload` | 受信した生ペイロード |
+| `received_at` / `enqueued_at` / `processed_at` | 受信〜enqueue〜処理完了の追跡 |
+| `status` | `pending` / `processed` / `failed` / `skipped` |
+| `error_message` | Sentry 紐付け用の短い説明 |
 
 #### 冪等性の判定ロジック
 
-```ruby
-class RevenueCatWebhookProcessor
-  def initialize(webhook_event)
-    @webhook_event = webhook_event
-    @payload = webhook_event.payload
-    @event_data = @payload['event']
-  end
+冪等性は Ruby 側の分岐ではなく DB に委ねる。
 
-  def process
-    return if @webhook_event.processed_at.present?
+1. `WebhookEvent.find_or_create_pending!` — `(provider, external_event_id)` の UNIQUE 制約で
+   同一イベントの二重受信を吸収する。同時到達で `RecordNotUnique` になった敗者側は
+   rescue して勝者の行を返すので 500 にならない
+   （外側のトランザクション内から呼ぶとトランザクションが abort し rescue 節も道連れになるため、
+   呼び出し元はトランザクション外であること）
+2. `WebhookEvent#claim_for_enqueue!` — 「`pending` かつ `enqueued_at` が NULL または十分古い」を
+   条件にした `update_all` 一発で enqueue 権を原子的に奪う。同時に呼ばれても成功するのは1回だけで、
+   Ruby 側のロックは不要
+3. `enqueued_at` が `STALE_ENQUEUE_THRESHOLD`（10分）より古ければ再 claim を許可する。
+   enqueue 自体の失敗やジョブ基盤の障害でジョブがロストしても、再送で復旧できる
 
-    begin
-      handle_event
-      @webhook_event.update!(processing_status: 'success', processed_at: Time.current)
-    rescue StandardError => e
-      @webhook_event.update!(processing_status: 'failed', error_message: e.message)
-      Sentry.capture_exception(e, tags: { source: 'revenuecat_webhook' })
-      raise
-    end
-  end
+#### イベントの分岐
 
-  private
+`case` 文ではなく `EventDispatcher`（event_type → Handler クラスの Hash）で分岐する。
+新しい event_type への対応は `HANDLERS` に 1 行足すだけで済む。
 
-  def handle_event
-    user = User.find_by(id: extract_user_id)
-    return unless user
+| event_type | Handler |
+|----|----|
+| `INITIAL_PURCHASE` / `TRIAL_STARTED` | `Handlers::InitialPurchaseHandler` |
+| `RENEWAL` | `Handlers::RenewalHandler` |
+| `CANCELLATION` | `Handlers::CancellationHandler` |
+| `EXPIRATION` | `Handlers::ExpirationHandler` |
+| `BILLING_ISSUE` | `Handlers::BillingIssueHandler` |
+| `REFUND` | `Handlers::RefundHandler` |
+| `UNCANCELLATION` | `Handlers::UncancellationHandler` |
+| `PRODUCT_CHANGE` | `Handlers::ProductChangeHandler` |
+| 上記以外 | `Handlers::UnknownEventHandler`（受信記録のみ） |
 
-    case @event_data['type']
-    when 'INITIAL_PURCHASE', 'TRIAL_STARTED'
-      handle_initial_purchase(user)
-    when 'RENEWAL'
-      handle_renewal(user)
-    when 'CANCELLATION'
-      handle_cancellation(user)
-    when 'EXPIRATION'
-      handle_expiration(user)
-    when 'BILLING_ISSUE'
-      handle_billing_issue(user)
-    when 'PRODUCT_CHANGE'
-      handle_product_change(user)
-    when 'REFUND'
-      handle_refund(user)
-    end
+Stripe 側も同じ構造で、現状 `checkout.session.completed` のみ Handler を持ち、
+それ以外は `Handlers::UnhandledEventHandler` で受信記録のみとして再送ループを防ぐ。
 
-    record_subscription_event(user)
-  end
-end
-```
+ペイロードの文字列キー直アクセスは `RevenueCat::WebhookPayload` / `App::Stripe::WebhookPayload`
+の値オブジェクトに集約し、ペイロード形式が変わったときの追随箇所を1か所に閉じ込める。
 
-### 11. 非同期処理（Sidekiq）
+### 11. 非同期処理（Solid Queue）
+
+ジョブキューは Sidekiq ではなく **Solid Queue** を採用した（`config/puma.rb` の
+`plugin :solid_queue` により Puma プロセス内で supervisor が同時起動するため、
+別 worker dyno を持たずに済む）。
+
+Webhook コントローラは 10 秒以内に応答する必要があるため、受信時は `WebhookEvent` の記録と
+enqueue のみを行い、状態遷移はジョブに委譲する。
 
 ```ruby
-class Api::V1::WebhooksController < ApplicationController
-  skip_before_action :authenticate_user!
-  before_action :verify_revenuecat_signature
-
-  def revenuecat
-    webhook_event = WebhookEvent.find_or_create_by!(
-      provider: 'revenuecat',
-      event_id: params[:event][:id]
-    ) do |we|
-      we.event_type = params[:event][:type]
-      we.payload = params.to_unsafe_h
-      we.received_at = Time.current
-      we.processing_status = 'pending'
-    end
-
-    if webhook_event.processing_status == 'pending'
-      RevenueCatWebhookJob.perform_later(webhook_event.id)
-    end
-
-    head :ok
-  rescue StandardError => e
-    Sentry.capture_exception(e)
-    head :internal_server_error
-  end
-
-  private
-
-  def verify_revenuecat_signature
-    expected = "Bearer #{ENV['REVENUECAT_WEBHOOK_SECRET']}"
-    head :unauthorized unless request.headers['Authorization'] == expected
-  end
-end
-
-class RevenueCatWebhookJob < ApplicationJob
-  queue_as :default
-
-  def perform(webhook_event_id)
-    webhook_event = WebhookEvent.find(webhook_event_id)
-    RevenueCatWebhookProcessor.new(webhook_event).process
-  end
-end
+# app/controllers/api/v1/webhooks/revenuecat_controller.rb
+webhook_event = WebhookEvent.find_or_create_pending!(
+  provider: 'revenuecat',
+  external_event_id: event_id,
+  event_type:,
+  payload: params.to_unsafe_h
+)
+RevenueCatWebhookJob.perform_later(webhook_event.id) if webhook_event.claim_for_enqueue!
+head :ok
 ```
+
+#### 署名検証
+
+| プロバイダ | 方式 |
+|----|----|
+| RevenueCat | `Authorization: Bearer <REVENUECAT_WEBHOOK_SECRET>`。長さの差をタイミング情報として漏らさないよう、両辺を SHA256 で固定長化してから `fixed_length_secure_compare` する |
+| Stripe | `Stripe::Webhook.construct_event(raw_body, Stripe-Signature, STRIPE_WEBHOOK_SECRET)`。Rails のミドルウェアが先に body を読み終えているケースに備えて `request.body.rewind` を前置する |
+
+`event.id` が欠落したペイロードは冪等性キーを作れないため、Sentry に警告を出して 422 で返す。
 
 ### 12. イベント順序非依存設計
 
@@ -417,24 +430,38 @@ end
 
 ### 13. 各イベントハンドラの実装
 
+各 Handler は `BaseHandler#with_resolved_subscription` で「User の解決」「Subscription の取得」
+「未知 product_id / store のスキップ」を共通化し、`call` に固有処理だけを書く。
+
 ```ruby
-def handle_initial_purchase(user)
-  subscription = user.subscription || user.build_subscription
-  is_trial = @event_data['period_type'] == 'TRIAL'
+# app/services/revenue_cat/handlers/initial_purchase_handler.rb
+class InitialPurchaseHandler < BaseHandler
+  def call
+    with_resolved_subscription(require_persisted: false, require_known_product: true) do |user, subscription|
+      is_trial = payload.trial?
+      started_at = payload.event_timestamp
 
-  subscription.update!(
-    status: is_trial ? 'trial' : 'active',
-    plan_type: detect_plan_type(@event_data['product_id']),
-    platform: detect_platform(@event_data['store']),
-    product_id: @event_data['product_id'],
-    started_at: Time.zone.at(@event_data['event_timestamp_ms'] / 1000),
-    expires_at: Time.zone.at(@event_data['expiration_at_ms'] / 1000),
-    has_used_trial: is_trial || subscription.has_used_trial,
-    is_early_subscriber: in_early_window?(@event_data['event_timestamp_ms']),
-    last_synced_at: Time.current
-  )
+      subscription.update!(
+        status: is_trial ? 'trial' : 'active',
+        plan_type: PlanCatalog.plan_type_from(payload.product_id),
+        platform: PlanCatalog.platform_from(payload.store),
+        product_id: payload.product_id,
+        started_at:,
+        expires_at: payload.expiration_at,
+        has_used_trial: is_trial || subscription.has_used_trial,
+        is_early_subscriber: TrialDaysCalculator.in_early_window?(started_at),
+        revenuecat_user_id: payload.app_user_id,
+        last_synced_at: Time.current
+      )
+      event_recorder.record(user, subscription, is_trial ? 'trial_started' : 'initial_purchase')
+    end
+  end
 end
+```
 
+他ハンドラの骨子（実装は `app/services/revenue_cat/handlers/` を参照）:
+
+```ruby
 def handle_cancellation(user)
   subscription = user.subscription
   return unless subscription
@@ -549,54 +576,63 @@ end
 
 #### 実装
 
+Controller（`Api::V1::Pro::CheckoutController`）は Flipper のゲートと例外のマッピングだけを持ち、
+Session 生成は `App::Stripe::CheckoutSessionBuilder` に委ねる。
+
 ```ruby
-class Api::V1::ProController < ApplicationController
-  def checkout
-    plan = params[:plan]
-    return render_error('Invalid plan') unless %w[monthly yearly].include?(plan)
+# app/services/app/stripe/checkout_session_builder.rb
+def call
+  raise InvalidPlanError unless VALID_PLANS.include?(@plan)
+  raise AlreadySubscribedError if @user.subscription_or_default.pro_active?
 
-    trial_days = determine_trial_days(current_user)
+  ::Stripe::Checkout::Session.create(
+    mode: 'subscription',
+    customer_email: @user.email,
+    line_items: [{ price: stripe_price_id, quantity: 1 }],
+    metadata: session_metadata,               # Session 側（checkout.session.completed が読む）
+    subscription_data:,                       # Subscription 側
+    success_url: @success_url,
+    cancel_url: @cancel_url
+  )
+end
+```
 
-    session = Stripe::Checkout::Session.create({
-      customer_email: current_user.email,
-      payment_method_types: %w[card],
-      line_items: [{ price: stripe_price_id(plan), quantity: 1 }],
-      mode: 'subscription',
-      subscription_data: {
-        trial_period_days: trial_days,
-        metadata: {
-          user_id: current_user.id,
-          plan: plan
-        }
-      },
-      success_url: params[:success_url],
-      cancel_url: params[:cancel_url]
-    })
+- `payment_method_types` は指定しない。有効な決済手段は Stripe ダッシュボード側の設定に委ねる
+- `trial_period_days` は 0 のとき **キーごと送らない**（`compact`）。0 を渡すと
+  「即時課金」ではなく「0日トライアル後課金」と解釈されうるため
 
-    render json: { checkout_url: session.url }
-  end
+#### エラーレスポンス
 
-  private
+front / mobile が原因を判定できるよう、安定コード（`error`）と文言（`message`）を分ける。
 
-  def determine_trial_days(user)
-    # 再加入時はトライアルなし
+| 状況 | HTTP | `error` |
+|----|----|----|
+| Flipper `:pro_features` 無効 | 403 | `feature_disabled` |
+| すでに Pro 加入中 | 409 | `already_subscribed` |
+| plan が monthly/yearly 以外 | 422 | `invalid_plan` |
+| Stripe API 側の障害 | 502 | `stripe_api_error` |
+
+#### トライアル日数の判定
+
+`TrialDaysCalculator` が単一ソース。返す値は **0 か 7 のみ**（早期特典の 30 日は未実装）。
+
+```ruby
+class TrialDaysCalculator
+  DEFAULT_WINDOW_START = '2026-05-31 00:00:00 +0900'
+  DEFAULT_WINDOW_END   = '2026-06-06 23:59:59 +0900'
+  NORMAL_TRIAL_DAYS = 7
+
+  def self.for(user)
     return 0 if user.subscription&.has_used_trial?
 
-    early_window_start = Time.zone.parse('2026-05-31 00:00:00')
-    early_window_end = Time.zone.parse('2026-06-06 23:59:59')
-
-    if Time.current.between?(early_window_start, early_window_end)
-      30
-    else
-      7
-    end
+    NORMAL_TRIAL_DAYS
   end
 
-  def stripe_price_id(plan)
-    case plan
-    when 'monthly' then ENV['STRIPE_PRICE_ID_MONTHLY']
-    when 'yearly' then ENV['STRIPE_PRICE_ID_YEARLY']
-    end
+  # is_early_subscriber 用。リリース日が後ろ倒しになる可能性があるため ENV で override 可能。
+  def self.in_early_window?(at = Time.current)
+    window_start = Time.zone.parse(ENV.fetch('EARLY_SUBSCRIBER_WINDOW_START', DEFAULT_WINDOW_START))
+    window_end   = Time.zone.parse(ENV.fetch('EARLY_SUBSCRIBER_WINDOW_END', DEFAULT_WINDOW_END))
+    at.between?(window_start, window_end)
   end
 end
 ```
@@ -640,28 +676,60 @@ end
 | AdMob SDK | 広告情報、IDFA | NSPrivacyTracking = true、ドメイン宣言 |
 | Sentry SDK | エラー情報 | データ収集の宣言 |
 
-### 18. UI 実装方針
+### 18. API エンドポイント
 
-- `ProSubscriptionModal`（mobile）/ `ProSubscriptionPage`（web）
-- `SubscriptionCancelPage`（web）
-- `SubscriptionStatusCard`（共通）
-- `PaywallModal`（Design Doc-01 で定義）
-- `BillingIssueAlert`（共通、Grace Period 中の警告表示）
-- `TrialExpiringBanner`（トライアル期限直前の予告）
+| メソッド / パス | 用途 |
+|----|----|
+| `GET /api/v1/pro/status` | Subscription と保有 entitlement キーの取得 |
+| `POST /api/v1/pro/sync` | RevenueCat REST から現在状態を取り直して上書き（同期更新） |
+| `GET /api/v1/pro/entitlements` | entitlement ごとの granted フラグ一覧 |
+| `POST /api/v1/pro/checkout` | Web の Stripe Checkout Session 作成 |
+| `DELETE /api/v1/pro/subscription` | Web の解約申請（cancel_at_period_end） |
+| `PATCH /api/v1/pro/subscription` | Web のプラン変更（月額↔年額） |
+| `POST /api/v1/pro/cancellation_feedbacks` | 解約理由アンケートの回答保存 |
+| `POST /api/v1/webhooks/revenuecat` | RevenueCat Webhook 受信 |
+| `POST /api/v1/webhooks/stripe` | Stripe Webhook 受信（Stripe ID の紐付けのみ） |
 
-### 19. テスト戦略
+`/api/v1/pro/sync` は RevenueCat の subscriber を唯一の入力としてローカル状態を上書きする
+（entitlement が無ければ `free` / `expired` に確定させる）。Stripe Checkout 直後は RevenueCat が
+まだ加入を取り込んでいないため、**反映待ちのポーリングに使ってはいけない**。反映待ちは
+読み取り専用の `GET /api/v1/pro/status` で行う。
+
+### 19. UI 実装方針
+
+| コンポーネント | 配置 | 役割 |
+|----|----|----|
+| `PaywallModal` | mobile | Pro 加入モーダル |
+| `ProUpgradeModal` | front | Pro 加入モーダル（Web は専用 LP を持たない） |
+| `CheckoutButton` | front | Stripe Checkout への遷移 |
+| `CancelGuideModal` / `CancelGuide` | mobile / front | ストア課金の解約手順案内（ios / android を出し分け） |
+| `WebCancelConfirmModal` / `CancelWebSubscription` | mobile / front | Web 解約の確認 |
+| `CancellationSurveyModal` | front | 解約理由アンケート |
+| `SubscriptionStatusCard` | mobile / front | 現在の Pro 状態と次回更新日 |
+| `BillingIssueAlert` / `BillingIssueGuide` | mobile / front | Grace Period 中の警告表示 |
+| `TrialExpiringBanner` | mobile / front | トライアル期限直前の予告 |
+| `ProUpsellCard` / `ProUpsellOverlay` / `SampleDataLabel` | mobile / front | Pro 機能の訴求 |
+
+解約導線は `subscription.platform` で必ず3分岐する（`web` / `ios` / `android`）。
+`platform !== "web"` の2分岐にすると、Google Play 購読の Android ユーザーに
+Apple ID の解約手順を案内してしまう。
+
+### 20. テスト戦略
 
 #### 単体テスト
 
-- RevenueCatWebhookProcessor の各イベントタイプ（PURCHASE, RENEWAL, CANCELLATION, EXPIRATION, BILLING_ISSUE, REFUND）
-- 冪等性の判定ロジック
+- 各 Handler（INITIAL_PURCHASE / TRIAL_STARTED / RENEWAL / CANCELLATION / EXPIRATION / BILLING_ISSUE / REFUND / UNCANCELLATION / PRODUCT_CHANGE / 未知イベント）
+- 冪等性（`find_or_create_pending!` の同時到達、`claim_for_enqueue!` の単一勝者、stale 再claim）
 - イベント順序非依存設計
-- determine_trial_days のロジック（早期 / 通常 / 再加入時）
-- Subscription.pro_active? の判定（trial/active/cancelled/billing_issue 全パターン）
+- `TrialDaysCalculator.for` / `.in_early_window?`
+- `PlanCatalog` の未知 product_id / store のスキップ挙動
+- `PeriodType.trial?` の大文字・小文字両対応
+- `Subscription#pro_active?` の判定（trial/active/cancelled/billing_issue/pending 全パターン）
 
 #### 統合テスト
 
 - iOS IAP の購入フロー（Sandbox）
+- Android の購入フロー（Play Console のライセンステスター）
 - Web Stripe の購入フロー（Test Mode）
 - 解約 → 期限切れ → 再加入 のフルフロー
 - Billing Issue → Recovered のフロー
@@ -671,12 +739,13 @@ end
 
 #### 手動テスト
 
-- 早期特典期間（5/31〜6/6）の動作
-- 通常トライアル期間（6/7以降）の動作
+- 早期特典期間内の加入で `is_early_subscriber` が立つこと
+- 初回加入で7日トライアルになること
 - トライアル期間中の解約
 - トライアル終了時の自動課金
 - 課金失敗時の通知
 - 再加入時のトライアル無効化
+- iOS / Android それぞれで解約導線の文言が正しいこと
 
 ---
 
@@ -735,19 +804,19 @@ Pro 即時利用と相性悪い。
 ### デメリット
 - 実装が複雑（冪等性、非同期、順序非依存、Grace Period）
 - 複数テーブル（subscriptions / webhook_events / user_subscription_events）の保守必要
-- Sidekiq 等のジョブキュー導入が必要
+- ジョブキュー（Solid Queue）の導入・運用が必要
 
 ### 受容理由
 課金は事業の生命線。信頼性を優先する。
 
 ---
 
-## Open Questions
+## Open Questions（解決済み）
 
-- [ ] BUZZ BASE に Sidekiq は既に導入されているか？（未導入なら追加必要）
-- [ ] Stripe Checkout の戻り URL は固定 or 動的？
-- [ ] Subscription 作成タイミング: ユーザー登録時に free で作るか、初課金時か
-- [ ] iOS の解約ガイドモーダルから iOS 設定アプリへの遷移は Linking.openURL で可能か
+- [x] ジョブキュー: Sidekiq ではなく Solid Queue を導入（Puma プロセス内で supervisor が起動）
+- [x] Stripe Checkout の戻り URL: サーバー側の `APP_URL` から組み立てる固定ホスト。クライアント発の origin は受け取らない
+- [x] Subscription 作成タイミング: 事前作成せず `User#subscription_or_default` で未加入時のデフォルトを返し、初回 Webhook / 同期で永続化する
+- [x] 解約ガイドからストア管理画面への遷移: `Linking.openURL` で可能（iOS は `apps.apple.com/account/subscriptions`、Android は `play.google.com/store/account/subscriptions`）
 
 ---
 
@@ -806,42 +875,32 @@ Pro 即時利用と相性悪い。
 
 ### Solid Queue による Webhook 非同期処理
 
+受信〜enqueue の実装は「11. 非同期処理（Solid Queue）」を参照。ジョブ側は指数バックオフで
+リトライする一方、リトライしても直らない永続的エラー（`PermanentWebhookError` のサブクラス。
+metadata 欠落・解決不能な user_id など）はリトライせず `failed` に落として Sentry に上げる。
+
 ```ruby
-# Gemfile
-gem 'solid_queue'
-
-# config/application.rb
-config.active_job.queue_adapter = :solid_queue
-
-# Webhook 受信時
-class Api::V1::WebhooksController < ApplicationController
-  def revenuecat
-    webhook_event = WebhookEvent.find_or_create_by!(
-      provider: 'revenuecat',
-      event_id: params[:event][:id]
-    ) do |we|
-      we.event_type = params[:event][:type]
-      we.payload = params.to_unsafe_h
-      we.received_at = Time.current
-      we.processing_status = 'pending'
-    end
-
-    RevenueCatWebhookJob.perform_later(webhook_event.id) if webhook_event.processing_status == 'pending'
-    head :ok
-  end
-end
-
-# Job クラス
 class RevenueCatWebhookJob < ApplicationJob
   queue_as :default
-  retry_on StandardError, wait: :exponentially_longer, attempts: 5
+  retry_on StandardError, wait: :polynomially_longer, attempts: 5
+
+  # ActiveJob は後から登録したハンドラが優先されるため retry_on より後に置く。
+  # 恒久的エラーは RevenueCat::PermanentWebhookError を継承させれば自動的に対象になる。
+  discard_on RevenueCat::PermanentWebhookError
 
   def perform(webhook_event_id)
-    webhook_event = WebhookEvent.find(webhook_event_id)
-    RevenueCatWebhookProcessor.new(webhook_event).process
+    webhook_event = WebhookEvent.find_by(id: webhook_event_id)
+    return unless webhook_event
+
+    RevenueCat::WebhookProcessor.new(webhook_event).process
   end
 end
 ```
+
+`WebhookProcessor#process` は `processed` のレコードのみガードする。`failed` は手動で再 enqueue
+したときに再処理させたいため、あえて素通しにしている。
+`RevenueCat::PermanentWebhookError` と `App::Stripe::PermanentWebhookError` は無関係な別クラスで、
+互いに継承させてはいけない。
 
 ### UNCANCELLATION イベント対応
 
@@ -930,6 +989,10 @@ end
 | `billing_issue` | 「決済情報の確認が必要です」（赤いバナー） |
 | `expired` | 「無料プラン」+ Pro 加入ボタン |
 | `free` | 「無料プラン」+ Pro 加入ボタン |
+| `pending` | 課金処理中の遷移状態。Pro 機能は不可（`PRO_ACTIVE_STATUSES` に含めない） |
+
+`pro_active?` は status が `trial` / `active` / `cancelled` / `billing_issue` のいずれかで、
+かつ `expires_at` が未来（または nil）のときだけ true。「期限切れの cancelled」は無料扱いになる。
 
 ### プラン変更（月額↔年額）
 
@@ -1006,11 +1069,16 @@ end
 |----|----|----|----|
 | Apple | App Store Connect → アプリ内課金 → Billing Grace Period | 無効 | **有効化（16日）** |
 | Stripe | Stripe ダッシュボード → Settings → Subscriptions and emails → Smart Retries | 有効（4回） | デフォルトのまま |
-| Google | Phase 2（Android リリース時） | - | - |
+| Google | Play Console → 定期購入 → 猶予期間 | 無効 | **有効化** |
+
+back 側は Grace Period 中の期限を `expires_at` に保存する（RevenueCat の
+`grace_period_expires_date` を優先）。`pro_active?` / `in_grace_period?` がこのカラムを見るため、
+猶予期間中も Pro 機能が維持される。
 
 #### リリース前チェックリスト
 
 - [ ] App Store Connect で Billing Grace Period を有効化（16日）
+- [ ] Play Console で猶予期間を有効化
 - [ ] Stripe で Smart Retries が有効化されているか確認
 - [ ] Sandbox / Test Mode で Grace Period の挙動を検証
 
@@ -1020,6 +1088,7 @@ end
 |----|----|
 | Web | 本番デプロイ + Flipper で ippei のみ有効化 + Stripe Test Mode |
 | iOS | TestFlight 配信 + Sandbox テスター + RevenueCat Sandbox |
+| Android | 内部テスト配信 + Play Console のライセンステスター + RevenueCat Sandbox |
 
 #### Stripe Test Mode の活用
 
@@ -1045,7 +1114,8 @@ Stripe.api_key = if ENV['USE_STRIPE_TEST_MODE'] == 'true'
 | 状況 | 対応 |
 |----|----|
 | Webhook 一時失敗 | RevenueCat が最大72時間自動リトライ |
-| Apple の請求失敗 | Apple が自動リトライ + Billing Grace Period（16日） |
+| enqueue 失敗 / ジョブロスト | `enqueued_at` が10分以上古ければ再送時に再 claim して復旧 |
+| Apple / Google の請求失敗 | 各ストアが自動リトライ + Billing Grace Period |
 | Stripe の請求失敗 | Smart Retries（最大4回、最大15日間リトライ） |
 | Solid Queue Job 失敗 | 指数バックオフでリトライ（最大5回） |
 

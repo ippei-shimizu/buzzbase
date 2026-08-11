@@ -1,8 +1,8 @@
 # PRD-08: 練習プラン（メニューセット × 割り当て）+ リマインド
 
 **作成日**: 2026-05-12
-**最終更新**: 2026-07-05（曜日固定の単一モデルから「メニューセット × 割り当て（繰り返し / 単発）」の2層へ再設計。試合・チーム練習日もカレンダーで一元化）
-**ステータス**: ドラフト（実装直前に詳細化）
+**最終更新**: 2026-08-11（実装内容に合わせて無料/Pro 境界・API・データモデル・通知方式を更新）
+**ステータス**: 実装済み（back / front / mobile）
 **親ドキュメント**: `../pro-plan-prd-202605.md`
 **前提PRD**: `01-system-architecture.md`, `05-pro-feature-practice-log.md`
 **設計**: [`../pro-plan-design/03-ux-information-architecture.md`](../pro-plan-design/03-ux-information-architecture.md) §1〜§2
@@ -136,39 +136,46 @@
 └──────────────────────────────┘
 ```
 
-### データモデルの変更点（後述スキーマへの追記・優先）
+### データモデルの変更点（後述の旧スキーマより優先）
 
-- **`menu_sets`（新規）**: メニューセット（テンプレート）。`user_id` / `name` / `note` / `sort_order`
-- **`menu_set_items`（新規）**: セット内メニュー。`menu_set_id` / `practice_menu_id` / `target_value` / `sort_order`
+- **`menu_sets`**: メニューセット（テンプレート）。`user_id` / `name`（必須・最大50文字） / `note` / `sort_order`
+- **`menu_set_items`**: セット内メニュー。`menu_set_id` / `practice_menu_id` / `target_value` / `sort_order`
 - **`schedules`（一般化）**: 「割り当て」を表す。旧「曜日固定のみ」から拡張:
   - `days_of_week` を **nullable** 化（繰り返し割り当て時のみ）
   - `planned_on`（date, nullable）を追加（単発割り当て時のみ）
-  - **制約: `days_of_week` と `planned_on` はどちらか一方が必須**（排他）
-  - `event_type`（string, 既定 `self_practice`）追加: `self_practice` / `practice` / `game` / `other`
+  - **制約: `days_of_week` と `planned_on` はどちらか一方が必須**（モデルバリデーションで排他）
+  - `event_type`（string, NOT NULL, 既定 `self_practice`）追加: `self_practice` / `practice` / `game` / `other`
   - `menu_set_id`（nullable FK）追加: セットから割り当てる場合に参照。個別メニューは従来どおり `schedule_menus` でも可
   - `scheduled_time` を **nullable** 化（試合・終日予定など時刻任意）
   - `game_result_id`（nullable FK）追加: `event_type = game` の予定を実績（試合結果）へ相互リンク
+  - `title` を **nullable** 化（`menu_set_id` があればセット名にフォールバック。無い場合のみ必須）
 - 予定メニューの展開は `menu_set`（あれば `menu_set_items`）→ 無ければ `schedule_menus` の順で解決する
+- 予定から作られた練習ログは `practice_logs.schedule_id` で紐付く。予定を削除してもログは実績として残し、紐付けだけ nullify する
 
-### API 変更点（優先・実装は v2）
+### API（v2・実装済み）
 
-- `GET /api/v2/plans/by_date?date=YYYY-MM-DD` — 当日の予定を **繰り返し ∪ 単発**で展開して返す（「今日のやること」用）
-- `GET /api/v2/plans/calendar?from=&to=` — 期間内の日別予定サマリー（カレンダー俯瞰用。日付ごとに `event_type` と件数）
-- `GET/POST/PATCH/DELETE /api/v2/menu_sets` — メニューセット CRUD（items 一括同期）
-- `POST/PATCH /api/v2/schedules` — `planned_on` / `event_type` / `menu_set_id` を受け付けるよう拡張（`days_of_week` 排他）
+- `GET /api/v2/plans/by_date?date=YYYY-MM-DD` — 当日の予定を **繰り返し ∪ 単発**で展開して返す（「今日のやること」用）。予定単位・メニュー単位の `done` 付き
+- `GET /api/v2/plans/calendar?from=&to=` — 期間内の日別予定エントリ（日付 / `event_type` / タイトル / `schedule_id` / 時刻）
+- `GET/POST/PATCH/DELETE /api/v2/schedules` — 割り当ての CRUD（`planned_on` / `event_type` / `menu_set_id` 対応）
+- `POST /api/v2/schedules/week_copy` — 指定週の単発予定を翌週へ一括コピー（Pro 限定）
+- `GET/POST/PATCH/DELETE /api/v2/menu_sets`（+ `GET /:id`） — メニューセット CRUD（items 一括同期）
 
-### 無料 / Pro 境界（2026-07-05 更新）
+`menu_set_id` / `practice_menu_id` は所有レコードのみ受け付ける（IDOR 防止）。
 
-- 割り当て（`schedules`）登録数: 無料 **3つ**まで / Pro 無制限（`SCHEDULE_FREE_LIMIT = 3` を踏襲。単発・繰り返し合算の active 件数で判定）
-- メニューセット登録数: 無料 **2つ**まで / Pro 無制限（新設 `MENU_SET_FREE_LIMIT = 2`）
-- カレンダー俯瞰の閲覧範囲: 無料は直近月中心、Pro は全期間（PRD-05 の草・閲覧方針に準拠）
-- カスタム通知文: Pro（`custom_notification_messages`・踏襲）
+### 無料 / Pro 境界（2026-08-11 更新）
+
+- 割り当て（`schedules`）登録数: **無料も無制限**（`schedule_single` は無料機能。当初の `SCHEDULE_FREE_LIMIT = 3` は撤回。習慣化の入口を絞ると継続率を落とすため）
+- メニューセット登録数: 無料 **2つ**まで / Pro 無制限（`MENU_SET_FREE_LIMIT = 2` / `unlimited_menu_sets`）
+- カレンダー俯瞰の閲覧範囲: 無料は **今日の前後3ヶ月**（`FREE_CALENDAR_WINDOW_MONTHS = 3`）に丸めて返す / Pro は全期間（`schedule_calendar_full_history`）
+- 週プランの「来週にコピー」: Pro 限定（`schedule_copy_next_week`）
+- カスタム通知文: Pro（`custom_notification_messages`）。無料ユーザーの指定は保存時に無視し、参照時も entitlement で出し分けるため解約後は端末の既定文に戻る
 
 ---
 
 ## 概要
 
-曜日別の自主練スケジュールを設定し、プッシュ通知でリマインドする Pro 機能。
+メニューセットと割り当て（繰り返し / 単発）で練習プランを組み、端末のローカル通知でリマインドする機能。
+割り当て自体は無料でも無制限に作れ、メニューセット数・カレンダー範囲・週コピー・カスタム通知文で Pro と差を付ける。
 練習の習慣化を仕組みで支え、JTBD「諦めない」「毎日続ける」を実現する。
 
 ---
@@ -196,9 +203,9 @@
 - その日に**同じメニューの練習ログがあれば自動で「済み」表示**（ゆるく照合・手動チェック不要）
 - 「既に練習済み」の通知文出し分けは MVP では行わず**固定文**（ローカル通知は発火時に状態判定できないため。後日検討）
 
-### 無料 / Pro（2026-06-27 更新）
+### 無料 / Pro
 
-- スケジュール登録数: 無料 **3つ**まで / Pro 無制限（F-10 の「1つまで」を更新）。カスタム通知文は Pro
+- 最新の境界は上部「無料 / Pro 境界（2026-08-11 更新）」を参照。スケジュール登録数の上限は撤回済み
 
 ---
 
@@ -234,64 +241,91 @@
 
 ### 必須機能
 
-| # | 機能 | 詳細 |
-|---|----|----|
-| F-01 | スケジュール作成 | 曜日 + 時刻 + メニュー（複数可） |
-| F-02 | 曜日選択 | 月〜日、複数選択可 |
-| F-03 | 時刻設定 | 1分刻み |
-| F-04 | メニュー紐付け | PRD-05 の practice_menus と連動 |
-| F-05 | プッシュ通知 | 設定時刻に通知 |
-| F-06 | 通知ON/OFF切り替え | スケジュール単位で |
-| F-07 | スケジュール一覧 | 週間ビューで全スケジュール表示 |
-| F-08 | 編集・削除 | スケジュールの修正可 |
-| F-09 | スケジュールから記録開始 | 通知タップで練習記録画面へ |
+| # | 機能 | 詳細 | 状態 |
+|---|----|----|----|
+| F-01 | 割り当て作成 | 繰り返し（曜日 + 時刻）または単発（日付）+ メニュー（複数可） | 実装済み |
+| F-02 | 曜日選択 | 月〜日、複数選択可（繰り返し時） | 実装済み |
+| F-03 | 時刻設定 | 1分刻み。終日予定は未設定可 | 実装済み |
+| F-04 | メニュー紐付け | PRD-05 の practice_menus と連動。メニューセット指定も可 | 実装済み |
+| F-05 | リマインド通知 | 設定時刻に端末のローカル通知 | 実装済み（mobile のみ） |
+| F-06 | 通知ON/OFF切り替え | 割り当て単位で | 実装済み |
+| F-07 | 一覧・俯瞰 | 週間プランビュー / 月カレンダー | 実装済み |
+| F-08 | 編集・削除 | 割り当ての修正可 | 実装済み |
+| F-09 | 予定から記録開始 | 通知タップ・「今日のやること」から量入力へ | 実装済み |
+| F-14 | メニューセット | 再利用できるメニューの束を作成・割り当て | 実装済み |
+| F-15 | 試合・チーム練習の一元表示 | `event_type` でカレンダーに同居 | 実装済み |
 
 ### Pro機能（無料との差別化）
 
-| # | 機能 | 無料 | Pro |
-|---|----|----|----|
-| F-10 | スケジュール登録数 | 1つまで | 無制限 |
-| F-11 | 通知頻度のカスタマイズ | × | ◎ |
-| F-12 | スケジュール別の通知メッセージ | × | ◎ |
-| F-13 | 月次の練習達成サマリー | × | ◎ |
+| # | 機能 | 無料 | Pro | Entitlement |
+|---|----|----|----|----|
+| F-10 | 割り当て（スケジュール）登録数 | 無制限 | 無制限 | —（無料機能化） |
+| F-11 | 通知頻度のカスタマイズ | — | — | **未実装** |
+| F-12 | 割り当て別の通知メッセージ | × | ◎ | `custom_notification_messages` |
+| F-13 | メニューセット登録数 | 2つまで | 無制限 | `unlimited_menu_sets` |
+| F-16 | カレンダー俯瞰の閲覧範囲 | 前後3ヶ月 | 全期間 | `schedule_calendar_full_history` |
+| F-17 | 週プランを来週へコピー | × | ◎ | `schedule_copy_next_week` |
+
+月次の練習達成サマリーは本機能ではなく PRD-12 の定期レポート（`advanced_periodic_review`）側で提供する。
 
 ---
 
 ## データモデル
 
-### schedules テーブル（新規）
+上部「データモデルの変更点」が最新。以下は実装後の最終形。
+
+### schedules テーブル（割り当て）
 
 ```ruby
-class CreateSchedules < ActiveRecord::Migration[7.0]
-  def change
-    create_table :schedules do |t|
-      t.references :user, null: false, foreign_key: true
-      t.string :title, null: false              # "朝の素振り"
-      t.string :days_of_week, null: false       # "1,3,5"（月・水・金）
-      t.time :scheduled_time, null: false       # 06:00
-      t.text :note
-      t.boolean :notification_enabled, default: true
-      t.boolean :active, default: true
-      t.string :notification_message            # カスタム通知文（Pro機能）
-      t.timestamps
-    end
-  end
+create_table :schedules do |t|
+  t.references :user, null: false, foreign_key: true
+  t.string :title                                  # menu_set_id が無い場合のみ必須（最大50文字）
+  t.string :days_of_week                           # "1,3,5"（月=1〜日=7）。繰り返し割り当て時のみ
+  t.date :planned_on                               # 単発割り当て時のみ（days_of_week と排他）
+  t.time :scheduled_time                           # 終日予定は nil
+  t.string :event_type, null: false, default: 'self_practice'  # self_practice / practice / game / other
+  t.references :menu_set, null: true
+  t.references :game_result, null: true            # event_type = game の実績リンク
+  t.text :note
+  t.boolean :notification_enabled, null: false, default: true
+  t.boolean :active, null: false, default: true
+  t.string :notification_message                   # カスタム通知文（Pro機能）
+  t.timestamps
 end
+
+add_index :schedules, [:user_id, :active]
+add_index :schedules, [:user_id, :planned_on]
 ```
 
 ### schedule_menus テーブル（中間テーブル）
 
 ```ruby
-class CreateScheduleMenus < ActiveRecord::Migration[7.0]
-  def change
-    create_table :schedule_menus do |t|
-      t.references :schedule, null: false, foreign_key: true
-      t.references :practice_menu, null: false, foreign_key: true
-      t.float :target_value
-      t.integer :sort_order, default: 0
-      t.timestamps
-    end
-  end
+create_table :schedule_menus do |t|
+  t.references :schedule, null: false, foreign_key: true
+  t.references :practice_menu, null: false, foreign_key: true
+  t.float :target_value
+  t.integer :sort_order, null: false, default: 0
+  t.timestamps
+end
+```
+
+### menu_sets / menu_set_items テーブル
+
+```ruby
+create_table :menu_sets do |t|
+  t.references :user, null: false, foreign_key: true
+  t.string :name, null: false
+  t.text :note
+  t.integer :sort_order, null: false, default: 0
+  t.timestamps
+end
+
+create_table :menu_set_items do |t|
+  t.references :menu_set, null: false, foreign_key: true
+  t.references :practice_menu, null: false, foreign_key: true
+  t.float :target_value
+  t.integer :sort_order, null: false, default: 0
+  t.timestamps
 end
 ```
 
@@ -299,28 +333,50 @@ end
 
 ## API 設計
 
-| メソッド | パス |
-|--------|----|
-| GET | `/api/v1/schedules` |
-| POST | `/api/v1/schedules` |
-| PATCH | `/api/v1/schedules/:id` |
-| DELETE | `/api/v1/schedules/:id` |
-| POST | `/api/v1/schedules/:id/toggle_notification` |
+上部「API（v2・実装済み）」が最新。通知 ON/OFF は専用エンドポイントを設けず、`PATCH` の `notification_enabled` で切り替える。
 
-### POST /api/v1/schedules
+### POST /api/v2/schedules
 
-リクエスト:
+リクエスト（繰り返し割り当て）:
 ```json
 {
-  "title": "朝の素振り",
-  "days_of_week": [1, 3, 5],
-  "scheduled_time": "06:00",
-  "menus": [
-    {"practice_menu_id": 10, "target_value": 200}
-  ],
-  "notification_enabled": true,
-  "notification_message": "おはよう！今日も素振りしよう"
+  "schedule": {
+    "title": "朝の素振り",
+    "days_of_week": "1,3,5",
+    "scheduled_time": "06:00",
+    "event_type": "self_practice",
+    "menus": [
+      {"practice_menu_id": 10, "target_value": 200}
+    ],
+    "notification_enabled": true,
+    "notification_message": "おはよう！今日も素振りしよう"
+  }
 }
+```
+
+単発割り当ては `days_of_week` の代わりに `planned_on: "2026-07-05"` を渡す（同時指定は 422）。メニューセットから割り当てる場合は `menus` ではなく `menu_set_id` を渡す。
+
+### GET /api/v2/plans/by_date
+
+「今日のやること」用。`done` は当日の練習ログとの照合結果で、予定内の全メニューがログ済みなら予定単位でも `done: true` になる。
+
+```json
+[
+  {
+    "id": 12,
+    "title": "オフ日ルーティン",
+    "event_type": "self_practice",
+    "scheduled_time": "06:00",
+    "recurring": true,
+    "menu_set_id": 3,
+    "game_result_id": null,
+    "note": null,
+    "done": false,
+    "menus": [
+      {"practice_menu_id": 10, "name": "素振り", "unit_label": "本", "target_value": 200, "sort_order": 0, "done": true}
+    ]
+  }
+]
 ```
 
 ---
@@ -391,23 +447,19 @@ end
 
 ## 通知配信の実装
 
-### 構成案: ローカル通知 + サーバー通知の併用
+**mobile の `expo-notifications` によるローカル通知のみ**。サーバー（FCM）からのリマインド送信・Web Push は実装しない。バックエンドは通知設定（`notification_enabled` / `notification_message`）を保管するだけで、発火には関与しない。
 
-#### iOS（推奨）
+### 同期の仕組み
 
-- `expo-notifications` でローカル通知をスケジュール
-- アプリ起動時に直近のスケジュールをデバイスにロード
-- バックグラウンドでも通知が届く
+- ログイン中は常時マウントされるコンポーネントが割り当て一覧の取得成功に追従し、端末のローカル通知を貼り直す（特定画面を開いたときだけ同期される状態を避ける）
+- 貼り直しは `schedule-` 接頭辞の既存通知を全解除してから再登録する。取得前・オフラインでの空配列では走らせない（登録済みリマインドが消えたまま復元されない事故を防ぐ）
+- 繰り返し割り当ては曜日ごとの WEEKLY トリガー、単発は DATE トリガーで登録する
+- `active` / `notification_enabled` が false の予定、時刻未設定（終日）の予定は通知しない
+- 単発で発火時刻が既に過去のものは即時発火してしまうため登録しない
 
-#### Web
+### 通知タップ後の遷移
 
-- Web Push 通知（FCM 等）
-- ブラウザに permission リクエスト
-
-### バックエンドからの補完通知
-
-- ローカル通知が機能しない場合のフォールバック
-- Rails の sidekiq + Firebase Cloud Messaging（FCM）
+通知の `data` に `type: "schedule_reminder"` と `scheduleId` を載せ、タップ時に該当予定へ遷移する。
 
 ---
 
@@ -415,11 +467,15 @@ end
 
 | ケース | 対応 |
 |------|----|
-| 無料ユーザーが2つ目のスケジュール | 「Pro で無制限に」訴求 |
+| 無料ユーザーが3つ目のメニューセット | 403 + 「Pro で無制限に」訴求 |
+| 無料ユーザーが週プランを来週へコピー | 403 + Pro 限定である旨を返す |
+| 無料ユーザーが範囲外のカレンダーを要求 | エラーにせず前後3ヶ月に丸めて返す |
 | 通知許可を拒否済み | アプリ内で再許可リクエスト |
-| 機内モード時 | ローカル通知は機能、サーバー通知は届かない |
-| 既に練習記録済みの場合 | 通知に「今日はもう練習済み！🎉」 |
-| スケジュール削除 | スケジュールに紐付く通知も削除 |
+| 機内モード時 | ローカル通知のみのため影響なし |
+| 既に練習記録済みの場合 | 通知文は固定（ローカル通知は発火時に状態判定できない）。「今日のやること」側で「済」表示 |
+| スケジュール削除 | 次回同期で `schedule-` 系通知を貼り直す際に消える。紐付く練習ログは実績として残し `schedule_id` のみ nullify |
+| 週コピーの連続実行 | コピー先に同一内容の予定があればスキップし、二重登録しない |
+| 予定のメニューを後から変更 | 既にログ済みのメニューは「済」判定が壊れるためクライアントで編集不可にする |
 
 ---
 
@@ -427,14 +483,15 @@ end
 
 ### 単体テスト
 
-- [ ] Schedule のバリデーション
-- [ ] days_of_week のパース
-- [ ] ScheduleMenu の紐付け
+- [ ] Schedule のバリデーション（`days_of_week` / `planned_on` の排他、`title` の必須条件）
+- [ ] `days_of_week` のパースと曜日展開
+- [ ] `resolved_menu_items`（メニューセット優先 → schedule_menus フォールバック）
 
 ### 統合テスト
 
-- [ ] スケジュール作成 → 通知設定 → 練習記録
-- [ ] Pro / 無料 の制限
+- [ ] 割り当て作成 → 通知設定 → 練習記録 → 「済」表示
+- [ ] `plans/by_date` の繰り返し ∪ 単発の集約
+- [ ] Pro / 無料 の制限（メニューセット数・カレンダー範囲・週コピー・カスタム通知文）
 
 ### 手動テスト
 
@@ -445,11 +502,14 @@ end
 
 ## 完了の定義（Definition of Done）
 
-- [ ] スケジュール作成・編集・削除が動作
-- [ ] 設定時刻にプッシュ通知が届く
-- [ ] 通知タップで練習記録画面に遷移
-- [ ] 無料は1つまで、Pro は無制限
-- [ ] 既に練習済みの場合は通知文を変更
+- [x] 割り当て（繰り返し / 単発）の作成・編集・削除が動作
+- [x] メニューセットの作成・割り当てが動作
+- [x] 週間プランビュー・カレンダー俯瞰が動作
+- [x] 設定時刻に端末のローカル通知が届く
+- [x] 通知タップで該当予定へ遷移し、量入力から記録できる
+- [x] 当日ログがあれば「今日のやること」で自動的に「済」表示
+- [x] Pro / 無料 の制限（メニューセット数・カレンダー範囲・週コピー・カスタム通知文）が正しく機能
+- 通知文の出し分け（練習済み判定）は MVP 不採用で固定文
 
 ---
 

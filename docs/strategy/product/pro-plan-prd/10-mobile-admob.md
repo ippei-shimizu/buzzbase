@@ -1,8 +1,8 @@
 # PRD-10: mobile AdMob 実装
 
 **作成日**: 2026-05-12
-**最終更新**: 2026-07-29（issue #444対応にあたり広告設計を全面見直し。リワード広告を廃止しバナー+インタースティシャルの2種類に縮小）
-**ステータス**: 実装直前に確定（issue #444で着手予定）
+**最終更新**: 2026-08-11（実装完了に伴い実装内容へ追随。mobile `release/pro-202605` に実装済み）
+**ステータス**: 実装済み（バックエンド連携＝ATT同意状態の保存・広告表示ログは見送り）
 **親ドキュメント**: `../pro-plan-prd-202605.md`
 **前提PRD**: `01-system-architecture.md`
 
@@ -55,13 +55,55 @@ Pro転換の説得力（＝お金を払う価値がある、という納得感�
 
 ---
 
+## 実装反映（2026-08-11）
+
+実装完了時点のコードを正とした差分。以降の全セクションと矛盾する場合は**本セクションを優先**する。
+
+### バナーは2種類に分かれた
+
+当初案の「320×50バナー1種」ではなく、役割の異なる2コンポーネントを実装した。
+
+| コンポーネント | サイズ | 配置 | 挙動 |
+|----|----|----|----|
+| `components/ads/AppBannerAd.tsx` | アンカー型アダプティブ（`ANCHORED_ADAPTIVE_BANNER`） | 5つのルート画面のスクロール領域直後＝ボトムナビ直上 | スクロール位置に関わらず常時表示。固定320×50だと横幅の広い端末で余白が出るためアダプティブを採用 |
+| `components/ads/InlineBannerAd.tsx` | `MEDIUM_RECTANGLE`（300×250） | 各画面のスクロール末尾（フィードの一番下） | 一番下まで読んだ人にだけ見える枠。`placement` で画面を識別 |
+
+### 広告ユニットIDの管理
+
+- `constants/admob.ts` で **画面（placement）×プラットフォーム別**に環境変数を分ける（`EXPO_PUBLIC_ADMOB_BANNER_UNIT_ID_{HOME,GAME_RESULTS,STATS,GROUPS,PROFILE}_{IOS,ANDROID}`）。AdMob管理画面でどの画面が稼いでいるか個別に見るため。ボトムナビ枠は `..._BOTTOM_NAV_{IOS,ANDROID}` として別ユニット
+- `__DEV__` では常に `TestIds` を使う（誤クリックによる無効なトラフィック＝ポリシー違反を防ぐ）
+- AdMobアプリIDは `app.config.js` で解決し、リリースビルド（`EXPO_PUBLIC_APP_ENV` が `production` / `preview`）で未設定ならビルド時に例外を投げる。開発ビルドはGoogleのサンプルアプリIDにフォールバック
+
+### Pro判定
+
+`useProStatus().isPro` ではなく **`useEntitlement().hasEntitlement("no_ads")`** を使う。加えて `isLoading` 中も非表示にする（Pro状態確定前は無料扱いになるため、Pro加入者に広告が一瞬フラッシュするのを防ぐ）。
+
+### ATT の表示タイミング
+
+`(tabs)/_layout.tsx` のログイン確定時に `requestTrackingPermissionOnce()` を呼ぶ。「機能チュートリアル後」ではなく**ログイン後のタブ表示時**。iOSはOS制約でダイアログを複数回出せないため、リクエスト済みかを `expo-secure-store` に記録し、許可/拒否いずれでも再表示しない。Androidは何もしない。
+
+`requestNonPersonalizedAdsOnly` はATT結果を反映していない（ATT拒否時はiOSがIDFAアクセス自体を遮断し、Google側で非パーソナライズにフォールバックするため）。EEA/GDPR圏のUMP同意管理は対象外＝将来展開時に要再検討。
+
+### インタースティシャルの状態管理
+
+`services/interstitialAdService.ts`。カウンタはプロセス内変数ではなく **`expo-secure-store` に永続化**する（インストール日・起動回数・最終表示日・当日表示回数）。起動回数は `(tabs)/_layout.tsx` のログイン確定時に `trackAppLaunchForAds()` でインクリメントするため、同一セッション内でログアウト→再ログインを繰り返すとその都度加算される（厳密な起動回数ではない）。
+
+ロード/表示イベントがどれも発火しない場合に保存後の画面遷移がブロックされないよう、**10秒のロードタイムアウト**を設けている。「スキップボタンは5秒後に表示」はAdMob SDK側の挙動で、アプリ側の実装項目ではない。
+
+### 未実装（見送り）
+
+- 「バックエンド連携」節の `users.ios_att_status` と `ad_impressions` テーブルは**実装していない**。ATT同意状態はSecureStoreに残るのみで、サーバーには送らない
+- 子供向け設定（`tagForChildDirectedTreatment` / `tagForUnderAgeOfConsent`）を明示指定するコードは無く、SDKのデフォルト（未設定）のまま。ターゲットが13歳以上のため実害は無いが、明示したい場合は `mobileAds().setRequestConfiguration()` の追加が必要
+
+---
+
 ## 機能要件
 
 ### 採用する広告フォーマット（2種類）
 
 | フォーマット | 配置 | 表示頻度 | eCPM |
 |----------|----|--------|------|
-| バナー広告（320×50） | Home・試合結果・成績・グループ・マイページ、各タブのルート画面のみ（ボトムナビ直上） | 常時 | 50-100円 |
+| バナー広告 | Home・試合結果・成績・グループ・マイページの各ルート画面。ボトムナビ直上（アンカー型アダプティブ）＋スクロール末尾（300×250） | 常時 | 50-100円 |
 | インタースティシャル | 試合記録保存完了直後 | 1日1回上限、初回起動後の猶予期間あり | 200-400円 |
 
 リワード広告は廃止（「実装状況」節参照）。ネイティブ広告（フィード型）はPhase 2で再検討する。
@@ -87,8 +129,8 @@ Pro転換の説得力（＝お金を払う価値がある、という納得感�
 
 #### 表示タイミング
 
-- アプリ初回起動時、機能チュートリアル後
-- 既存ユーザーは初回 Pro リリース版アップデート後の起動時
+- ログイン確定後、タブ画面の表示時に1回だけ（実装は `(tabs)/_layout.tsx` → `requestTrackingPermissionOnce()`）
+- 許可/拒否いずれの結果でも再表示しない（`expo-secure-store` にリクエスト済みフラグを記録）
 
 #### 表示文言
 
@@ -142,62 +184,18 @@ Pro転換の説得力（＝お金を払う価値がある、という納得感�
 
 ## 実装詳細
 
-### バナー広告
+実装済みのため、詳細はコードを参照する。
 
-```typescript
-// mobile/components/ads/BannerAd.tsx
-import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
-import { useProStatus } from '@hooks/useProStatus';
+| 責務 | ファイル |
+|----|----|
+| 広告ユニットID解決（placement×プラットフォーム、`__DEV__` は TestIds） | `mobile/constants/admob.ts` |
+| ボトムナビ直上バナー | `mobile/components/ads/AppBannerAd.tsx` |
+| スクロール末尾バナー | `mobile/components/ads/InlineBannerAd.tsx` |
+| インタースティシャル（猶予期間・1日1回・SecureStore永続） | `mobile/services/interstitialAdService.ts` |
+| ATTダイアログ（1インストール1回） | `mobile/services/trackingTransparencyService.ts` |
+| AdMobアプリIDの焼き込みとリリース時の未設定検出 | `mobile/app.config.js` |
 
-const adUnitId = __DEV__
-  ? TestIds.BANNER
-  : process.env.EXPO_PUBLIC_ADMOB_BANNER_UNIT_ID;
-
-export const AppBannerAd = () => {
-  const { isPro } = useProStatus();
-  if (isPro) return null;
-
-  return (
-    <BannerAd
-      unitId={adUnitId}
-      size={BannerAdSize.BANNER}
-      requestOptions={{ requestNonPersonalizedAdsOnly: false }}
-    />
-  );
-};
-```
-
-### インタースティシャル広告
-
-```typescript
-// mobile/services/interstitialAd.ts
-import { InterstitialAd, AdEventType } from 'react-native-google-mobile-ads';
-
-const interstitial = InterstitialAd.createForAdRequest(adUnitId);
-
-// 初回起動後しばらくは広告を出さず、初回体験の質を守る猶予期間。
-const GRACE_PERIOD_DAYS = 7;
-const GRACE_PERIOD_LAUNCH_COUNT = 5;
-
-export class InterstitialAdManager {
-  private static todayShownCount = 0;
-  private static readonly DAILY_LIMIT = 1;
-
-  static async show(): Promise<void> {
-    if (this.todayShownCount >= this.DAILY_LIMIT) return;
-    if (await isPro()) return;
-    if (await isWithinGracePeriod(GRACE_PERIOD_DAYS, GRACE_PERIOD_LAUNCH_COUNT)) return;
-
-    interstitial.load();
-    interstitial.show();
-    this.todayShownCount++;
-  }
-
-  static resetDailyCount() {
-    this.todayShownCount = 0;
-  }
-}
-```
+判定・タイミングの要点は「実装反映」節にまとめている。
 
 ---
 
@@ -211,11 +209,11 @@ export class InterstitialAdManager {
 
 | 画面 | 配置場所 | 表示条件 |
 |----|------|----|
-| Home（ダッシュボード） | ボトムナビ直上 | 常時 |
-| 試合結果一覧 | ボトムナビ直上 | 常時 |
-| 成績 | ボトムナビ直上 | 常時 |
-| グループ一覧 | ボトムナビ直上 | 常時 |
-| マイページ | ボトムナビ直上 | 常時 |
+| Home（ダッシュボード） | ボトムナビ直上＋スクロール末尾（ダッシュボード / 活動タブの各末尾） | 常時 |
+| 試合結果一覧 | ボトムナビ直上＋スクロール末尾 | 常時 |
+| 成績 | ボトムナビ直上＋スクロール末尾 | 常時 |
+| グループ一覧 | ボトムナビ直上＋リスト末尾 | 常時 |
+| マイページ | ボトムナビ直上＋スクロール末尾 | 常時 |
 
 ### バナー非表示画面
 
@@ -240,7 +238,9 @@ export class InterstitialAdManager {
 
 ---
 
-## バックエンド連携
+## バックエンド連携（未実装・将来案）
+
+以下2つはいずれも**実装していない**。ATT同意状態は端末内に留め、広告表示ログも取っていない。必要になった時点で再検討する。
 
 ### AdMob 同意状態の管理
 
@@ -328,12 +328,12 @@ DAU = MAU × 5% 前提、加重平均 eCPM 約100円:
 
 ## 完了の定義（Definition of Done）
 
-- [ ] iOS で AdMob テスト広告が表示される
-- [ ] ATT ダイアログが初回起動時に表示
-- [ ] Pro 加入で全広告（バナー・インタースティシャル）非表示
-- [ ] バナー / インタースティシャルの2種類が動作
-- [ ] バナーがタブの5ルート画面のみに表示され、ネスト画面には表示されない
-- [ ] AdMob 本番ユニットID で動作確認
+- [x] iOS で AdMob テスト広告が表示される（`__DEV__` は常に `TestIds`）
+- [x] ATT ダイアログがログイン後1回だけ表示
+- [x] Pro 加入で全広告（バナー・インタースティシャル）非表示（`no_ads` entitlement、`isLoading` 中も非表示）
+- [x] バナー / インタースティシャルの2種類が動作
+- [x] バナーがタブの5ルート画面のみに表示され、ネスト画面には表示されない
+- [ ] AdMob 本番ユニットID で動作確認（EASの環境変数設定が前提。Android アプリIDは `EXPO_PUBLIC_ADMOB_ANDROID_APP_ID` が必須）
 - [ ] EAS Build で実機テスト通過
 
 ---

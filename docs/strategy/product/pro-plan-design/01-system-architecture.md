@@ -1,8 +1,8 @@
 # Design Doc: システムアーキテクチャ
 
 **作成日**: 2026-05-12
-**最終更新**: 2026-05-12（解約フロー・cancelled/billing_issue ステータス・データ保持ポリシー追加）
-**Status**: Draft
+**最終更新**: 2026-08-11（release/pro-202605 の実装を正としてデータモデル・Entitlement・API・環境変数を実態に同期）
+**Status**: Implemented
 **関連 PRD**: [`../pro-plan-prd/01-system-architecture.md`](../pro-plan-prd/01-system-architecture.md)
 
 ---
@@ -29,7 +29,6 @@ BUZZ BASE Pro リリースに伴い、ユーザーの Pro 加入状態を管理�
 
 ## Non-goals
 
-- Android 課金の実装（Phase 2 以降）
 - マルチテナンシー設計
 - Pro 機能の個別実装（各機能 Design Doc で設計）
 
@@ -50,7 +49,7 @@ mobile (React Native + Expo SDK 55)
 | 層 | 既存スタック |
 |---|---------|
 | Web | Next.js + TypeScript + TailwindCSS + Server Components |
-| API | Rails 7.0 (API) + PostgreSQL 15.5 + devise_token_auth + AMS |
+| API | Rails 7.1 (API) + PostgreSQL 15.5 + devise_token_auth + AMS |
 | Mobile | React Native + Expo SDK 55 + NativeWind v4 + axios |
 | 認証 | devise_token_auth |
 | エラー監視 | Sentry |
@@ -58,31 +57,32 @@ mobile (React Native + Expo SDK 55)
 ### 2. Pro 機能による追加コンポーネント
 
 ```
-┌─────────────────────────────────────────────┐
-│   front (Web)         mobile (iOS)          │
-│   ├─ Stripe.js        ├─ react-native-      │
-│   │                   │  google-mobile-ads  │
-│   │                   ├─ react-native-      │
-│   │                   │  purchases          │
-│   │                   ├─ expo-tracking-     │
-│   │                   │  transparency       │
-│   └─ RevenueCat Web SDK                     │
-│           ↓                                 │
-│   ┌──────────────────────────┐              │
-│   │     RevenueCat           │              │
-│   │  サブスク状態管理         │              │
-│   │  (Source of Truth)       │              │
-│   └──────────────────────────┘              │
-│           ↓ Webhook                         │
-│   ┌──────────────────────────┐              │
-│   │     back (Rails API)     │              │
-│   └──────────────────────────┘              │
-│           ↓                                 │
-│   ┌──────────────────────────┐              │
-│   │     PostgreSQL DB        │              │
-│   └──────────────────────────┘              │
-└─────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│  front (Web)            mobile (iOS / Android)   │
+│  └─ @stripe/stripe-js   ├─ react-native-         │
+│     （Checkout へ遷移）  │  google-mobile-ads     │
+│                         ├─ react-native-purchases│
+│                         └─ expo-tracking-        │
+│                            transparency          │
+│         ↓                        ↓               │
+│  ┌────────────┐          ┌────────────┐          │
+│  │   Stripe   │          │ RevenueCat │          │
+│  └────────────┘          └────────────┘          │
+│         ↓ Webhook                ↓ Webhook       │
+│  ┌────────────────────────────────────┐          │
+│  │           back (Rails API)         │          │
+│  │  webhook_events に記録 → Job で処理 │          │
+│  └────────────────────────────────────┘          │
+│                    ↓                             │
+│  ┌────────────────────────────────────┐          │
+│  │           PostgreSQL DB            │          │
+│  └────────────────────────────────────┘          │
+└──────────────────────────────────────────────────┘
 ```
+
+front には RevenueCat Web SDK を入れず、`POST /api/v1/pro/checkout` で back が Stripe Checkout Session を発行し、
+その URL へ遷移させる。Web 課金の状態反映は Stripe Webhook（`App::Stripe::WebhookProcessor`）が担う。
+mobile は react-native-purchases 経由で RevenueCat を使い、状態反映は RevenueCat Webhook が担う。
 
 #### 新規追加サービス
 
@@ -96,21 +96,27 @@ mobile (React Native + Expo SDK 55)
 ### 3. Source of Truth の階層
 
 ```
-┌─────────────────────────────┐
-│ Source of Truth: RevenueCat │
-└─────────────────────────────┘
+┌──────────────────────────────────────┐
+│ Source of Truth                      │
+│ - iOS / Android: RevenueCat          │
+│ - Web: Stripe                        │
+└──────────────────────────────────────┘
             ↓ Webhook（リアルタイム）
-┌─────────────────────────────┐
-│ Cache: Rails DB             │
-│ - subscriptions テーブル    │
-└─────────────────────────────┘
-            ↓ API
-┌─────────────────────────────┐
-│ Cache: front / mobile       │
-│ - useProStatus() で取得     │
-│ - メモリキャッシュ          │
-└─────────────────────────────┘
+┌──────────────────────────────────────┐
+│ Cache: Rails DB                      │
+│ - subscriptions テーブル             │
+└──────────────────────────────────────┘
+            ↓ API（GET /api/v1/pro/status）
+┌──────────────────────────────────────┐
+│ Cache: front / mobile                │
+│ - useProStatus() で取得              │
+│ - front は ProStatusProvider が保持   │
+└──────────────────────────────────────┘
 ```
+
+front の Server Component からは `getCachedProStatus()`（`app/(app)/pro/proStatus.ts`）で
+リクエスト単位にメモ化して取得する。Client Component は `ProStatusProvider` 配下の
+`useProStatus()` を使う。
 
 ### 4. Subscription の状態機械
 
@@ -144,32 +150,35 @@ mobile (React Native + Expo SDK 55)
 
 #### subscriptions テーブル
 
-```ruby
-class CreateSubscriptions < ActiveRecord::Migration[7.0]
-  def change
-    create_table :subscriptions do |t|
-      t.references :user, null: false, foreign_key: true, index: { unique: true }
-      t.string :status, null: false, default: 'free'
-      t.string :plan_type                                # 'monthly'/'yearly'/nil
-      t.string :platform                                 # 'ios'/'web'/'android'
-      t.string :product_id                               # 'buzzbase_pro_monthly' 等
-      t.datetime :started_at
-      t.datetime :expires_at
-      t.datetime :cancelled_at                           # 🆕 解約申請日時
-      t.datetime :refunded_at                            # 🆕 返金日時
-      t.datetime :billing_issue_at                       # 🆕 課金失敗日時
-      t.boolean :has_used_trial, default: false          # 🆕 トライアル使用済みフラグ
-      t.string :revenuecat_user_id
-      t.string :revenuecat_entitlement_id, default: 'pro'
-      t.boolean :is_early_subscriber, default: false
-      t.datetime :last_synced_at
-      t.timestamps
-    end
+実装後の `db/schema.rb` 相当（Stripe 連携カラムが後から追加されている）:
 
-    add_index :subscriptions, :status
-    add_index :subscriptions, :revenuecat_user_id, unique: true
-    add_index :subscriptions, :expires_at
-  end
+```ruby
+create_table 'subscriptions' do |t|
+  t.bigint   'user_id', null: false
+  t.string   'status', default: 'free', null: false
+  t.string   'plan_type'                    # 'monthly'/'yearly'/nil
+  t.string   'platform'                     # 'ios'/'web'/'android'
+  t.string   'product_id'
+  t.datetime 'started_at'
+  t.datetime 'expires_at'
+  t.datetime 'cancelled_at'                 # 解約申請日時
+  t.datetime 'refunded_at'                  # 返金日時
+  t.datetime 'billing_issue_at'             # 課金失敗日時
+  t.boolean  'has_used_trial', default: false, null: false
+  t.string   'revenuecat_user_id'
+  t.string   'revenuecat_entitlement_id'    # デフォルト値は持たせない
+  t.boolean  'is_early_subscriber', default: false, null: false
+  t.datetime 'last_synced_at'
+  t.timestamps
+  t.string   'stripe_customer_id'           # Web 課金用
+  t.string   'stripe_subscription_id'       # Web 課金用
+
+  t.index ['user_id'], unique: true
+  t.index ['status']
+  t.index ['expires_at']
+  t.index ['revenuecat_user_id'], unique: true
+  t.index ['stripe_customer_id'], unique: true, where: 'stripe_customer_id IS NOT NULL'
+  t.index ['stripe_subscription_id'], unique: true, where: 'stripe_subscription_id IS NOT NULL'
 end
 ```
 
@@ -192,7 +201,7 @@ class CreateUserSubscriptionEvents < ActiveRecord::Migration[7.0]
       t.string :product_id
       t.string :period_type                             # 'TRIAL'/'NORMAL'/'INTRO'
       t.datetime :occurred_at, null: false
-      t.json :raw_payload
+      t.jsonb :raw_payload
       t.string :revenuecat_event_id                     # 冪等性用
       t.timestamps
     end
@@ -210,88 +219,79 @@ end
 ```ruby
 class Subscription < ApplicationRecord
   belongs_to :user
-  has_many :user_subscription_events, dependent: :destroy
+  # イベントは監査ログなので subscription 削除時も残す
+  has_many :user_subscription_events, dependent: :nullify
 
-  enum status: {
-    free: 'free',
-    trial: 'trial',
-    active: 'active',
-    cancelled: 'cancelled',
-    billing_issue: 'billing_issue',
-    expired: 'expired',
-    pending: 'pending'
-  }
+  STATUSES = %w[free trial active cancelled billing_issue expired pending].freeze
+  PRO_ACTIVE_STATUSES = %w[trial active cancelled billing_issue].freeze
+  GRACE_STATUSES = %w[cancelled billing_issue].freeze
 
-  enum plan_type: {
-    monthly: 'monthly',
-    yearly: 'yearly'
-  }, _prefix: :plan
+  enum status: { free: 'free', trial: 'trial', active: 'active', cancelled: 'cancelled',
+                 billing_issue: 'billing_issue', expired: 'expired', pending: 'pending' }
+  enum plan_type: { monthly: 'monthly', yearly: 'yearly' }, _prefix: :plan
+  enum platform: { ios: 'ios', web: 'web', android: 'android' }, _prefix: :platform
 
-  enum platform: {
-    ios: 'ios',
-    web: 'web',
-    android: 'android'
-  }, _prefix: :platform
+  validates :status, inclusion: { in: STATUSES }
 
-  # Pro 機能が利用可能か
-  # trial / active / cancelled / billing_issue は期限内なら利用可
   def pro_active?
-    return true if force_pro_for_testing?
-    return false unless %w[trial active cancelled billing_issue].include?(status)
+    return false unless PRO_ACTIVE_STATUSES.include?(status)
+
     expires_at.nil? || expires_at > Time.current
   end
 
   def in_trial?
-    trial? && expires_at&.> Time.current
+    trial? && (expires_at.nil? || expires_at > Time.current)
   end
 
+  # 「期限切れの cancelled / billing_issue」は無料状態と見なすため false
   def in_grace_period?
-    cancelled? || billing_issue?
+    return false unless GRACE_STATUSES.include?(status)
+
+    expires_at.nil? || expires_at > Time.current
   end
 
   def days_remaining
     return nil unless expires_at
+
     [(expires_at.to_date - Date.current).to_i, 0].max
   end
 
-  # トライアル可能か（再加入時の判定）
   def can_use_trial?
     !has_used_trial?
   end
-
-  private
-
-  def force_pro_for_testing?
-    Rails.env.development? && user.admin?
-  end
 end
 ```
+
+**admin の強制 Pro モード（`Rails.env.development? && user.admin?` で `pro_active?` を true にする案）は未実装**。
+`pro_active?` に環境依存の分岐は入っておらず、開発時の Pro 確認は subscription レコードを直接書き換えて行う。
 
 #### User モデルへの拡張（最小限）
 
 ```ruby
 class User < ApplicationRecord
   include Entitlement
+  include PlanLimits
+  include SubscriptionCallbacks
 
   has_one :subscription, dependent: :destroy
+  has_many :user_subscription_events, dependent: :destroy
 
-  def admin?
-    is_admin?
-  end
-
+  # subscription 未生成のユーザーでも nil 安全に判定できるよう、未保存の free レコードを返す
   def subscription_or_default
     subscription || Subscription.new(user: self, status: 'free')
   end
 
-  def pro_active?
-    subscription_or_default.pro_active?
-  end
-
-  def in_trial?
-    subscription_or_default.in_trial?
-  end
+  delegate :pro_active?, to: :subscription_or_default
+  delegate :in_trial?, to: :subscription_or_default
 end
 ```
+
+`SubscriptionCallbacks`（`app/models/concerns/subscription_callbacks.rb`）に Subscription 関連の
+コールバックを集約している:
+
+- `after_create :create_default_subscription` — 登録時に `status: 'free'` を作成
+- `before_destroy :prevent_destroy_if_pro_active` — Pro 加入中は退会をブロック（外部の自動課金が続くため）
+- `after_update :sync_stripe_customer_email` — Web 課金ユーザーの email 変更を Stripe Customer に追従
 
 ### 7. Entitlement Module
 
@@ -312,20 +312,44 @@ module Entitlement
     monthly_goal_single
     schedule_single
   ].freeze
+  # monthly_goal_single: 個人の期間目標（月次/週次/年間）は無料でも 2 つまで作成可
+  #                      （カスタム期間は Pro 限定の custom_period_goals）
+  # schedule_single:     自主練スケジュールは無料でも無制限に作成可（キー名は初期案の名残）
 
+  # Pro 機能の追加に伴い実装時点で 30 件超まで拡張されている。
+  # 最新の正はコード（app/models/concerns/entitlement.rb）を参照。
   PRO_FEATURES = %w[
     no_ads
     season_transition_graph
     grass_full_history
     unlimited_practice_menus
     unlimited_media_uploads
-    media_long_term_storage
-    unlimited_schedules
+    schedule_copy_next_week
+    unlimited_menu_sets
     unlimited_monthly_goals
     season_goals
+    tournament_goals
     custom_notification_messages
-    advanced_goal_tracking
     detailed_condition_log
+    unlimited_improvement_themes
+    correlation_insights
+    unlimited_reflection_templates
+    advanced_periodic_review
+    note_tags
+    multi_game_result_notes
+    multi_improvement_theme_links
+    practice_menu_trend_detail
+    custom_period_goals
+    manual_metric_goals
+    shadow_swing_custom_interval
+    shadow_swing_vibration
+    shadow_swing_background
+    schedule_calendar_full_history
+    unlimited_groups
+    hit_direction_average
+    count_situation_average
+    pitch_type_average
+    pitcher_faceoff_average
   ].freeze
 
   ALL_FEATURES = FREE_FEATURES + PRO_FEATURES
@@ -338,6 +362,10 @@ module Entitlement
 end
 ```
 
+初期案にあった `media_long_term_storage` / `unlimited_schedules` / `advanced_goal_tracking` は
+キー自体を廃止した。メディア保管期間は `unlimited_media_uploads` に統合し、
+自主練スケジュールは無料でも無制限としたためキーが不要になった。
+
 ### 8. データ保持ポリシー（ロック方式）🆕
 
 #### 基本方針
@@ -348,73 +376,76 @@ end
 
 #### 機能ごとの挙動
 
-| データ | Pro 期間中 | cancelled（期限内） | expired（無料に戻った後） |
-|----|----|----|----|
-| 練習メニュー（4個目以降） | 表示・編集可 | 表示・編集可 | **非表示・編集不可**（archived 表示なし） |
-| 動画・画像（31日以上前） | 表示可 | 表示可 | **非表示** |
-| 草機能（過去31日以上） | 表示可 | 表示可 | **非表示** |
-| シーズン跨ぎグラフ | 表示可 | 表示可 | **閲覧不可** |
-| 詳細統計 | 表示可 | 表示可 | **閲覧不可** |
-| 試合記録（無料機能） | 表示・編集可 | 表示・編集可 | **表示・編集可** |
-| 練習記録（基本） | 表示・編集可 | 表示・編集可 | **表示・編集可** |
+| データ | Pro 期間中 | cancelled（期限内） | expired（無料に戻った後） | ロックの実装箇所 |
+|----|----|----|----|----|
+| 練習メニュー（4個目以降） | 表示・編集可 | 表示・編集可 | **非表示・編集不可** | front / mobile（`hasEntitlement`） |
+| 動画・画像 | 制限なし | 制限なし | 月3点・動画30秒/480p・画像5MB まで | back `MediaAttachments::LimitValidator` |
+| 草機能（過去31日以上） | 表示可 | 表示可 | **非表示** | back `Api::V2::ActivityLogsController` |
+| シーズン跨ぎグラフ | 表示可 | 表示可 | **閲覧不可** | front / mobile |
+| 詳細統計 | 表示可 | 表示可 | **閲覧不可** | front / mobile |
+| 試合記録（無料機能） | 表示・編集可 | 表示・編集可 | **表示・編集可** | — |
+| 練習記録（基本） | 表示・編集可 | 表示・編集可 | **表示・編集可** | — |
+
+**メディアの「30日で非表示」は実装していない**。過去にアップロードした動画・画像は無料に戻っても
+閲覧できる。無料/Pro の差は「当月アップロード可能な点数」と「動画の長さ・解像度、画像サイズ」で表現する。
 
 #### 実装イメージ
 
+back で絞り込むのは草機能のみ。練習メニュー等の一覧ロックはクライアント側で行う。
+
 ```ruby
-# 練習メニュー取得時
-def practice_menus_for(user)
-  scope = user.practice_menus.where(archived: false)
-  scope = scope.limit(3) unless user.has_entitlement?('unlimited_practice_menus')
-  scope
-end
-
-# 動画取得時
-def media_attachments_for(user)
-  scope = user.media_attachments
-  unless user.has_entitlement?('unlimited_media_uploads')
-    scope = scope.where(created_at: 30.days.ago..)
-  end
-  scope
-end
-
-# 草機能取得時
+# 草機能取得時（Api::V2::ActivityLogsController）
 def heatmap_for(user, from:, to:)
   unless user.has_entitlement?('grass_full_history')
-    from = [from, 30.days.ago.to_date].max  # 直近30日に制限
+    from = [from, Date.current - (FREE_WINDOW_DAYS - 1)].max
   end
   user.activity_logs.where(activity_date: from..to)
 end
+
+# メディアアップロード（MediaAttachments::LimitValidator）
+# 無料: 動画 30秒 / 長辺 480px、画像 5MB
+# Pro : 動画 180秒 / 長辺 1280px、画像 10MB
 ```
 
 #### Business Rules メソッド（書き込み制限）
 
+`app/models/concerns/plan_limits.rb` の `PlanLimits` concern に集約し、User に include する。
+上限値は定数で持ち、`can_*?` は「Entitlement があれば即 true、無ければ現在の保有数で判定」の形に統一する。
+
 ```ruby
-class User < ApplicationRecord
+module PlanLimits
+  extend ActiveSupport::Concern
+
+  PRACTICE_MENU_FREE_LIMIT = 3
+  MEDIA_UPLOAD_FREE_LIMIT_PER_MONTH = 3
+  MENU_SET_FREE_LIMIT = 2
+  MONTHLY_GOAL_FREE_LIMIT = 2
+  IMPROVEMENT_THEME_FREE_LIMIT = 2
+  REFLECTION_TEMPLATE_FREE_LIMIT = 1
+  GROUP_FREE_LIMIT = 1
+  INSIGHT_COMBINATION_LIMIT = 20  # 機能自体が Pro 限定のため Pro 内での歯止め
+
   def can_create_practice_menu?
     return true if has_entitlement?('unlimited_practice_menus')
-    practice_menus.where(archived: false).count < 3
+
+    practice_menus.where(archived: false).count < PRACTICE_MENU_FREE_LIMIT
   end
 
-  def can_upload_media_this_month?
-    return true if has_entitlement?('unlimited_media_uploads')
-    media_attachments.where(created_at: Time.current.beginning_of_month..).count < 3
-  end
+  # 以下同型: can_upload_media_this_month? / can_create_menu_set? /
+  # can_create_monthly_goal? / can_create_improvement_theme? /
+  # can_create_reflection_template? / can_create_or_join_group?
 
-  def can_create_schedule?
-    return true if has_entitlement?('unlimited_schedules')
-    schedules.where(active: true).count < 1
-  end
-
-  def can_create_monthly_goal?
-    return true if has_entitlement?('unlimited_monthly_goals')
-    goals.monthly.active.count < 1
-  end
-
-  def can_create_season_goal?
-    has_entitlement?('season_goals')
-  end
+  # Pro 限定機能はそのまま entitlement を返す
+  def can_create_season_goal? = has_entitlement?('season_goals')
+  def can_create_tournament_goal? = has_entitlement?('tournament_goals')
+  def can_create_custom_period_goal? = has_entitlement?('custom_period_goals')
+  def can_create_manual_metric_goal? = has_entitlement?('manual_metric_goals')
 end
 ```
+
+- 自主練スケジュールは無料でも無制限にしたため `can_create_schedule?` は存在しない
+- 個人の期間目標（月次/週次/年間/カスタム）は無料枠 2 件を共有する（初期案の 1 件から変更）
+- 当月のメディア件数は `failed` と放置された `pending`（1時間経過）を除外して数える
 
 ### 9. クライアント側の抽象化
 
@@ -428,21 +459,29 @@ const PRO_FEATURES = [...] as const;
 export type Feature = typeof FREE_FEATURES[number] | typeof PRO_FEATURES[number];
 
 export function useEntitlement() {
-  const { proStatus } = useProStatus();
+  const { proStatus, isPro, isLoading } = useProStatus();
 
+  // サーバーが返した保有キー配列をそのまま参照する（クライアントで Pro 判定を再実装しない）
   const hasEntitlement = useCallback((feature: Feature): boolean => {
     if ((FREE_FEATURES as readonly string[]).includes(feature)) return true;
-    return proStatus.isActive;
-  }, [proStatus.isActive]);
+    return proStatus.entitlements.includes(feature);
+  }, [proStatus.entitlements]);
 
   return {
-    isPro: proStatus.isActive,
-    inTrial: proStatus.status === 'trial',
-    inGracePeriod: ['cancelled', 'billing_issue'].includes(proStatus.status),
+    isPro,                                          // = subscription.pro_active
+    inTrial: proStatus.subscription.in_trial,
+    inGracePeriod: proStatus.subscription.in_grace_period,
+    isLoading,                                      // 未確定の間だけ true
     hasEntitlement,
   };
 }
 ```
+
+`inTrial` / `inGracePeriod` はサーバーが期限判定済みのフラグを使う。`status` 文字列からクライアントで
+判定すると、期限切れの `cancelled` / `billing_issue` を Pro 扱いしてしまうため。
+
+`isLoading` は必須。Pro 状態が確定する前に無料扱いで描画すると、加入済みユーザーにロック UI が
+一瞬見える（フリッカー）。
 
 #### ProGate ラッパーコンポーネント
 
@@ -450,17 +489,31 @@ export function useEntitlement() {
 interface ProGateProps {
   feature: Feature;
   children: ReactNode;
+  /** 未加入時に children の代わりに出す静的ノード */
   fallback?: ReactNode;
+  /** タップで加入モーダルを開くロックトリガー。fallback より優先 */
+  renderLockedTrigger?: (open: () => void) => ReactNode;
 }
 
-export function ProGate({ feature, children, fallback }: ProGateProps) {
-  const { hasEntitlement } = useEntitlement();
+export default function ProGate({ feature, children, fallback, renderLockedTrigger }: ProGateProps) {
+  const { hasEntitlement, isLoading } = useEntitlement();
+  const { open } = useProUpgradeModal();
+
+  if (isLoading) return null;
   if (hasEntitlement(feature)) return <>{children}</>;
-  return <>{fallback ?? <PaywallModal feature={feature} />}</>;
+  if (renderLockedTrigger) return <>{renderLockedTrigger(() => open({ trigger: feature }))}</>;
+  return <>{fallback ?? null}</>;
 }
 ```
 
-#### PaywallModal 統一コンポーネント
+ProGate 自身はモーダルをレンダリングしない。front では `ProUpgradeModalProvider` が
+モーダルを常設し、ProGate は `open()` を渡すだけにしている（ゲートの数だけモーダルが
+マウントされるのを避けるため）。
+
+#### Paywall 統一コンポーネント
+
+front は `ProUpgradeModal` + `paywallCopy.ts`、mobile は `PaywallModal` として実装した。
+どちらも「機能キー → 訴求コピー」のマップを1つ持ち、機能ごとに別モーダルは作らない。
 
 ```typescript
 const PAYWALL_COPY: Record<ProFeature, { title: string; description: string }> = {
@@ -484,22 +537,31 @@ export function PaywallModal({ feature, onClose }: PaywallModalProps) {
       <Title>{copy.title}</Title>
       <Description>{copy.description}</Description>
       <Button onPress={() => router.push('/pro')}>Pro に加入する</Button>
-      <Button onPress={() => showRewardedAd(feature)}>広告を見て1回お試し</Button>
       <Button onPress={onClose}>閉じる</Button>
     </Modal>
   );
 }
 ```
 
+初期案にあった「広告を見て1回お試し」（リワード広告での一時解放）は実装していない。
+
 ### 10. API エンドポイント設計
 
 | メソッド | パス | 用途 |
 |--------|----|----|
-| GET | `/api/v1/pro/status` | 現在のユーザーの Pro 状態取得 |
+| GET | `/api/v1/pro/status` | 現在のユーザーの Pro 状態 + 保有 entitlement 取得 |
 | POST | `/api/v1/pro/sync` | RevenueCat と Rails の Pro 状態を同期 |
+| GET | `/api/v1/pro/entitlements` | 全 entitlement キーの granted 一覧取得 |
+| POST | `/api/v1/pro/checkout` | Web 加入用の Stripe Checkout Session を発行 |
+| PATCH | `/api/v1/pro/subscription` | プラン変更（monthly / yearly） |
+| DELETE | `/api/v1/pro/subscription` | Web 課金の解約 |
+| POST | `/api/v1/pro/cancellation_feedbacks` | 解約理由アンケートの送信 |
 | POST | `/api/v1/webhooks/revenuecat` | RevenueCat からの Webhook 受信 |
-| GET | `/api/v1/pro/entitlements/check?key=xxx` | 特定機能の利用可否チェック |
-| GET | `/api/v1/pro/entitlements` | 全ての Entitlement リスト取得 |
+| POST | `/api/v1/webhooks/stripe` | Stripe からの Webhook 受信 |
+| GET | `/api/v1/feature_flags?keys[]=...` | Flipper の flag 状態取得（ホワイトリスト方式） |
+
+`/pro/entitlements/check?key=xxx`（単一キー照会）は作らなかった。`/pro/status` が保有キーの配列を
+返すため、クライアントは1回の取得で全判定でき、キーごとのリクエストが不要になる。
 
 #### GET /api/v1/pro/status
 
@@ -511,6 +573,7 @@ export function PaywallModal({ feature, onClose }: PaywallModalProps) {
     "platform": "ios",
     "started_at": "2026-05-31T00:00:00+09:00",
     "expires_at": "2026-06-30T00:00:00+09:00",
+    "pro_active": true,
     "in_trial": false,
     "in_grace_period": false,
     "days_remaining": 18,
@@ -518,13 +581,40 @@ export function PaywallModal({ feature, onClose }: PaywallModalProps) {
     "has_used_trial": true
   },
   "entitlements": [
+    "basic_game_record",
     "no_ads",
     "season_transition_graph",
-    "grass_full_history",
-    // ...
+    "grass_full_history"
   ]
 }
 ```
+
+`entitlements` は無料機能キーも含む「現在保有している全キー」。
+`pro_active` はサーバー側で期限判定まで済ませたフラグで、クライアントの Pro 判定はこれを単一の真実とする
+（`status` から判定すると、期限切れの `cancelled` / `billing_issue` を誤って Pro 扱いしてしまう）。
+
+#### GET /api/v1/pro/entitlements
+
+```json
+{
+  "entitlements": [
+    { "key": "basic_game_record", "granted": true },
+    { "key": "season_transition_graph", "granted": false }
+  ]
+}
+```
+
+#### エラーレスポンス
+
+Pro 関連の 4xx は「安定した機械可読コード（`error`）」を返す。文言はクライアント側で持つ。
+
+| コード | ステータス | 意味 |
+|----|----|----|
+| `feature_disabled` | 403 | Flipper `pro_features` が無効 |
+| `already_subscribed` | 409 | 既に Pro 加入中 |
+| `invalid_plan` | 422 | 未知のプラン指定 |
+| `no_active_subscription` | 422 | 変更・解約対象の契約が無い |
+| `stripe_api_error` / `revenuecat_api_error` | 502 | 決済プロバイダ側の障害 |
 
 ### 11. 認証・セキュリティ
 
@@ -534,34 +624,44 @@ export function PaywallModal({ feature, onClose }: PaywallModalProps) {
 
 #### 環境変数
 
-`.env` に追加が必要:
+back（`.env`）:
 
 ```
-# RevenueCat
-REVENUECAT_API_KEY_IOS=
-REVENUECAT_API_KEY_WEB=
-REVENUECAT_WEBHOOK_SECRET=
+REVENUECAT_SECRET_API_KEY=       # REST API から subscriber を取得する用
+REVENUECAT_WEBHOOK_SECRET=       # Authorization: Bearer <secret> を検証
 
-# Stripe
-STRIPE_PUBLISHABLE_KEY=
 STRIPE_SECRET_KEY=
+STRIPE_SECRET_KEY_TEST=
+USE_STRIPE_TEST_MODE=            # true のときテストキー・テスト商品を使う
 STRIPE_WEBHOOK_SECRET=
 STRIPE_PRICE_ID_MONTHLY=
 STRIPE_PRICE_ID_YEARLY=
-
-# AdMob
-ADMOB_IOS_APP_ID=
-ADMOB_IOS_BANNER_UNIT_ID=
-ADMOB_IOS_INTERSTITIAL_UNIT_ID=
-ADMOB_IOS_REWARDED_UNIT_ID=
+STRIPE_PRODUCT_ID_MONTHLY=
+STRIPE_PRODUCT_ID_YEARLY=
 ```
+
+mobile（`EXPO_PUBLIC_*`。AdMob のユニット ID は iOS / Android × 配置画面ごとに分ける）:
+
+```
+EXPO_PUBLIC_REVENUECAT_API_KEY_IOS=
+EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID=
+EXPO_PUBLIC_ADMOB_BANNER_UNIT_ID_{HOME,STATS,GAME_RESULTS,GROUPS,PROFILE,BOTTOM_NAV}_{IOS,ANDROID}=
+EXPO_PUBLIC_ADMOB_INTERSTITIAL_UNIT_ID_{IOS,ANDROID}=
+```
+
+front は RevenueCat SDK を使わず、Stripe Checkout の URL は back が返すため、Pro 固有の
+公開環境変数は持たない。リワード広告は未実装のため `REWARDED` 系のユニット ID も無い。
 
 ### 12. Sentry 監視追加
 
-- `pro:webhook:failed` - Webhook 処理失敗
-- `pro:sync:mismatch` - Rails / RevenueCat の状態不一致
-- `pro:purchase:failed` - 購入処理失敗
-- `pro:entitlement:check_failed` - Entitlement チェック失敗
+独自イベント名は定義せず、例外をそのまま送って `tags: { source: ... }` で発生箇所を切り分ける。
+
+```ruby
+Sentry.capture_exception(e, tags: { source: 'revenuecat_webhook_controller' })
+```
+
+主な `source`: `revenuecat_webhook_controller` / `stripe_webhook_controller` /
+`pro_sync_controller` / `pro_checkout_controller`
 
 ---
 
@@ -629,12 +729,17 @@ ADMOB_IOS_REWARDED_UNIT_ID=
 
 ---
 
-## Open Questions
+## Open Questions（実装で決着した分）
 
-- [ ] Rails で Pundit を採用するか（初期は軽量で開始）
-- [ ] Subscription を作成するタイミング（ユーザー登録時 free で作る or 初課金時に作る）
-- [ ] entitlement キーの管理（Rails 側と front / mobile 側で重複定義になる）
-- [ ] subscription の論理削除 vs 物理削除
+- [x] Rails で Pundit を採用するか → **採用せず**。Entitlement / PlanLimits の concern と
+      コントローラの `has_entitlement?` 判定で足りている
+- [x] Subscription を作成するタイミング → **ユーザー登録時に `status: 'free'` で作成**
+      （`SubscriptionCallbacks#create_default_subscription`）
+- [x] entitlement キーの管理 → **Rails と front / mobile で重複定義のまま**。
+      サーバーが `/pro/status` で保有キー配列を返し、クライアントは判定ロジックを持たず
+      配列の包含チェックだけを行うことで、乖離の影響を「キー名の typo」に閉じ込めている
+- [ ] subscription の論理削除 vs 物理削除（未決着。現状は `has_one :subscription, dependent: :destroy`
+      で物理削除だが、監査ログの `user_subscription_events` は `dependent: :nullify` で残す）
 
 ---
 
@@ -705,15 +810,17 @@ config.active_job.queue_adapter = :solid_queue
 
 ### Feature Flag: Flipper 採用
 
-`flipper`, `flipper-active_record`, `flipper-ui` を導入。
+`flipper`, `flipper-active_record` を導入（`flipper-ui` は入れず、操作は Rails console から行う）。
 
 #### 主な Flag
 
 | Flag | 用途 |
 |----|----|
-| `pro_features` | Pro 機能全体の有効化 |
-| `cancellation_survey` | 解約理由アンケート |
-| `pro_test_mode` | 本番テスト用 |
+| `pro_features` | 新規販売の kill switch（無効時は checkout を 403 で止める） |
+| `cancellation_survey` | 解約理由アンケート（無効時はエンドポイントを 404 で隠す） |
+
+クライアントに公開する flag は `Api::V1::FeatureFlagsController::PUBLIC_KEYS` のホワイトリストで
+制限する（社内検証用 flag が漏れるのを防ぐため）。`pro_test_mode` は作らなかった。
 
 #### Flag 制御パターン
 
@@ -738,17 +845,11 @@ Flipper.disable(:pro_features)
 #### mobile での Flag 取得
 
 mobile（React Native）には Flipper を直接導入できないが、`/api/v1/feature_flags` API 経由で flag の状態を取得して制御する。
+取得したい flag は `keys[]` で明示し、レスポンスは `{ "<key>": boolean }` のフラットなマップを返す。
 
-```typescript
-// mobile/hooks/useFeatureFlags.ts
-export function useFeatureFlags() {
-  const { data } = useQuery({
-    queryKey: ['feature_flags'],
-    queryFn: () => axiosInstance.get('/api/v1/feature_flags'),
-    staleTime: 5 * 60 * 1000,
-  });
-  return data?.flags ?? {};
-}
+```
+GET /api/v1/feature_flags?keys[]=pro_features&keys[]=cancellation_survey
+→ { "pro_features": true, "cancellation_survey": false }
 ```
 
 ### リリース戦略
@@ -799,9 +900,10 @@ end
 
 理由: モデルの定義が将来変更されると、過去のマイグレーションが動かなくなる。
 
-### RevenueCat Custom Attributes
+### RevenueCat Custom Attributes（未実装）
 
-ユーザー属性を RevenueCat に渡してダッシュボードでセグメント分析:
+`Purchases.setAttributes()` の呼び出しは入れていない。将来ダッシュボードでセグメント分析したく
+なったときの案として残す:
 
 ```typescript
 // mobile / front

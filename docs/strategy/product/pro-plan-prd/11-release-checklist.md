@@ -1,15 +1,20 @@
 # PRD-11: リリースチェックリスト
 
 **作成日**: 2026-05-12
-**ステータス**: ドラフト（リリース直前に詳細化）
+**最終更新**: 2026-08-11（実装状況に合わせてチェック状態を更新）
+**ステータス**: 開発項目は概ね完了。ストア対応・告知・運用準備が残（リリース日は再設定）
 **親ドキュメント**: `../pro-plan-prd-202605.md`
 
 ---
 
 ## 概要
 
-2026年5月31日リリースに向けた、開発・テスト・ストア対応・告知の完了チェックリスト。
+Pro プランリリースに向けた、開発・テスト・ストア対応・告知の完了チェックリスト。
 リリース直前に再点検する。
+
+当初の 2026-05-31 リリース目標は過ぎており、実装は `release/pro-202605` ブランチ上で継続中（未マージ）。
+以下のチェック状態は **コードで裏付けが取れる開発項目のみ** を反映しており、ストア設定・外部 SaaS 設定・告知・
+運用体制など、リポジトリ外の作業は確認できないため未チェックのままにしてある。
 
 ---
 
@@ -17,50 +22,53 @@
 
 ### バックエンド（back）
 
-- [ ] users テーブルマイグレーション完了
-- [ ] practice_menus / practice_logs / condition_logs テーブル作成
-- [ ] shadow_swing_sessions テーブル作成
-- [ ] goals / goal_badges テーブル作成
-- [ ] schedules / schedule_menus テーブル作成
-- [ ] activity_logs テーブル作成
-- [ ] media_attachments テーブル作成
-- [ ] baseball_notes テーブル拡張
-- [ ] /api/v1/pro/* エンドポイント実装
-- [ ] /api/v1/webhooks/revenuecat エンドポイント実装
-- [ ] 各 Pro 機能の API エンドポイント実装
-- [ ] FinalizeGoalsJob 等のバッチジョブ設定
-- [ ] CleanupExpiredMediaJob 設定
-- [ ] Stripe Webhook 受信処理
+- [x] 課金状態テーブル作成（`subscriptions` / `user_subscription_events` / `cancellation_feedbacks`）
+      ※ Pro 状態は users のカラムではなく `subscriptions` で保持し、`User#has_entitlement?` で判定する
+- [x] practice_menus / practice_logs / practice_sessions / condition_logs テーブル作成
+- [x] shadow_swing_sessions テーブル作成
+- [x] goals / goal_badges テーブル作成
+- [x] schedules / schedule_menus テーブル作成
+- [x] activity_logs テーブル作成
+- [x] media_attachments テーブル作成
+- [x] baseball_notes テーブル拡張
+- [x] /api/v1/pro/* エンドポイント実装（status / sync / entitlements / checkout / subscription / cancellation_feedbacks）
+- [x] /api/v1/webhooks/revenuecat エンドポイント実装
+- [x] 各 Pro 機能の API エンドポイント実装（v2 名前空間）
+- [x] FinalizeGoalsJob 等のバッチジョブ設定（`config/recurring.yml`）
+- [x] 期限切れメディアの掃除ジョブ設定（`PurgeStaleMediaAttachmentsJob` / `MediaAttachmentDeletionJob`）
+- [x] GeneratePeriodicReviewJob（週次・月次レポート生成）設定
 - [ ] 環境変数を本番に設定
 
 ### フロントエンド（front）
 
-- [ ] Pro 加入ページ（/pro）
-- [ ] 価格表示ページ（/help/pro/pricing）
-- [ ] FAQ ページ（/help/pro/faq）
-- [ ] 解約ページ（/account/subscription）
-- [ ] ヘルプドキュメント（/help/pro/*）
-- [ ] 各 Pro 機能の UI 実装
-- [ ] 広告表示（Web AdSense は既存）
-- [ ] Stripe Checkout 連携
-- [ ] RevenueCat Web SDK 連携
-- [ ] Pro 訴求モーダル
+- [x] Pro 加入導線（`ProUpgradeModal` + `CheckoutButton`。Stripe Checkout の戻り先として `/pro/success` `/pro/cancel`）
+      ※ 独立した加入ページ `/pro` は作らず、機能ごとの訴求から直接モーダルを開く形にした
+- [x] 特定商取引法に基づく表記（/tokushoho、価格・無料トライアル条件を記載）
+- [ ] 価格表示ページ（/help/pro/pricing）※ 未実装。価格は /tokushoho と加入モーダルに集約中
+- [ ] FAQ ページ（/help/pro/faq）※ 未実装
+- [x] 解約ページ（/account/subscription）
+- [ ] ヘルプドキュメント（/help/pro/*）※ 未実装
+- [x] 各 Pro 機能の UI 実装
+- [x] 広告表示（Web AdSense は既存）
+- [x] Stripe Checkout 連携
+- [x] Pro 状態の同期（RevenueCat Web SDK は使わず、back の `/api/v1/pro/sync` 経由で RevenueCat REST を叩く）
+- [x] Pro 訴求モーダル
 
 ### モバイル（mobile）
 
-- [ ] react-native-google-mobile-ads 導入
-- [ ] expo-tracking-transparency 導入
-- [ ] react-native-purchases (RevenueCat SDK) 導入
-- [ ] ATT ダイアログ実装
-- [ ] バナー広告実装
-- [ ] インタースティシャル広告実装
-- [ ] リワード広告実装
-- [ ] iOS IAP 連携
-- [ ] Pro 加入画面
-- [ ] 各 Pro 機能の UI 実装
-- [ ] 設定画面の Pro 状態表示
-- [ ] プッシュ通知（スケジュール）
-- [ ] EAS Build 設定更新
+- [x] react-native-google-mobile-ads 導入
+- [x] expo-tracking-transparency 導入
+- [x] react-native-purchases (RevenueCat SDK) 導入
+- [x] ATT ダイアログ実装（`services/trackingTransparencyService.ts`）
+- [x] バナー広告実装（`AppBannerAd` / `InlineBannerAd`）
+- [x] インタースティシャル広告実装（`services/interstitialAdService.ts`）
+- [ ] リワード広告実装 ※ 未実装。初回リリースはバナー＋インタースティシャルのみで出す
+- [x] iOS IAP 連携
+- [x] Pro 加入画面（`app/pro/`）
+- [x] 各 Pro 機能の UI 実装
+- [x] 設定画面の Pro 状態表示（`app/account/subscription/`）
+- [x] プッシュ通知（スケジュール・Streak リマインド）
+- [x] EAS Build 設定更新
 
 ---
 
@@ -74,8 +82,11 @@
   - [ ] プロモーションテキスト更新
   - [ ] What's New（リリースノート）
 - [ ] サブスクリプション商品作成
-  - [ ] `buzzbase_pro_monthly` - ¥300/月、Introductory Offer 7日無料
-  - [ ] `buzzbase_pro_yearly` - ¥2,980/年、Introductory Offer 7日無料
+  - [ ] `buzzbase_pro_monthly` - ¥480/月、Introductory Offer 7日無料
+  - [ ] `buzzbase_pro_yearly` - ¥4,800/年（月あたり¥400相当）、Introductory Offer 7日無料
+
+> 価格は 2026-08-10 に月額¥480 / 年額¥4,800 へ改定済み。App Store Connect の登録値を正とし、
+> Web 側の表示は `front/app/components/pro/proPricing.ts` に集約している。
 - [ ] Promotional Offer 作成
   - [ ] 30日無料（早期特典用）
   - [ ] オファーコード配布設定
@@ -154,17 +165,21 @@
 
 ## 4. ドキュメント
 
-- [ ] Pro 機能一覧ページ（/help/pro/features）
-- [ ] 料金プランページ（/help/pro/pricing）
-- [ ] FAQ ページ（/help/pro/faq）
-- [ ] 解約方法ページ（/help/pro/cancel）
-- [ ] リリース予告ページ（/help/pro/coming-soon）
-- [ ] プライバシーポリシー更新（/privacy）
-- [ ] 利用規約更新（/terms）
+- [ ] Pro 機能一覧ページ（/help/pro/features）※ 未実装。加入モーダル内の機能比較表で代替中
+- [ ] 料金プランページ（/help/pro/pricing）※ 未実装
+- [ ] FAQ ページ（/help/pro/faq）※ 未実装
+- [x] 解約方法の案内（`/account/subscription` の `CancelGuide` / `PlanChangeGuide` に集約。独立ページは作らない）
+- [ ] リリース予告ページ（/help/pro/coming-soon）※ 未実装
+- [x] プライバシーポリシー更新（front: /privacypolicy、mobile: `app/privacy-policy.tsx`。AdMob / RevenueCat / Stripe を明記）
+- [x] 利用規約更新（front: /termsofservice、mobile: `app/terms-of-service.tsx`。Pro・サブスクリプション条項を追加）
+- [x] 特定商取引法に基づく表記（front: /tokushoho、mobile: `app/tokushoho.tsx`）
 
 ---
 
 ## 5. 告知準備
+
+> 以下の日付は 2026-05-31 リリースを前提にしたもの。リリース日が未確定のため、
+> 「10日前 / 4日前 / 前夜 / 当日」の**相対スケジュールとして読み替える**（8, 9 章の日付も同様）。
 
 ### 5/20 頃（10日前）
 

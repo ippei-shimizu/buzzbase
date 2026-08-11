@@ -1,7 +1,8 @@
 # PRD-12: 上達ループ拡張（課題テーマ / 相関インサイト / 振り返りテンプレ / 週次レポート）
 
 **作成日**: 2026-07-02
-**ステータス**: ドラフト（実装直前に詳細化）
+**最終更新**: 2026-08-11（実装に合わせて仕様を更新）
+**ステータス**: 実装済み（`release/pro-202605`）。F-A / F-C / F-D は完了、F-B は FB-03・FB-05 が未着手
 **親ドキュメント**: `../pro-plan-prd-202605.md`
 **前提PRD**: `01-system-architecture.md` / `05-pro-feature-practice-log.md` / `09-pro-feature-baseball-note-ext.md`
 **関連PRD**: `06-pro-feature-graph.md`（推移グラフ）/ `07-pro-feature-goal.md`（目標）
@@ -53,18 +54,19 @@
 |---|----|----|
 | FA-01 | 課題の作成・編集・削除 | 名前（必須）／カテゴリ（PRD-05 のカテゴリを流用）／任意メモ・目的 |
 | FA-02 | 状態管理 | `open`（取組中）/ `achieved`（克服）/ `archived`。克服時に達成日を記録 |
-| FA-03 | 記録との紐付け | 練習セッション・ノートに課題を紐付け（任意・複数不可＝1記録1課題）。保存フローで直近の open 課題をプリセット |
+| FA-03 | 記録との紐付け | 練習セッション・ノートに課題を紐付け（任意）。**複数課題の紐付けを許容**し、無料は1記録1件まで、Pro は複数（`multi_improvement_theme_links`）。保存フローで直近の open 課題をプリセット |
 | FA-04 | 取組サマリー | 課題ごとに 取組日数・連続日数・関連練習数・関連ノート数を集計表示 |
 | FA-05 | ホーム常設カード | 「今取り組んでいる課題」を活動セグメント上部に常設。open が無ければ設定を促す空状態 |
 | FA-06 | 課題履歴 | 克服・アーカイブした課題を一覧（達成の勲章として残す） |
 
 ## 無料 / Pro
 
-| 項目 | 無料 | Pro |
-|----|----|----|
-| 同時 open 課題数 | 1つ | 無制限（推奨1〜2） |
-| 課題履歴の閲覧 | 全期間 | 全期間 |
-| 課題×成績の相関（F-B 連携） | × | ◎ |
+| 項目 | 無料 | Pro | Entitlement |
+|----|----|----|----|
+| 同時 open 課題数 | 2つ | 無制限（推奨1〜2） | `unlimited_improvement_themes` |
+| 1記録あたりの課題紐付け数 | 1件 | 複数 | `multi_improvement_theme_links` |
+| 課題履歴の閲覧 | 全期間 | 全期間 | - |
+| 課題×成績の相関（F-B 連携） | × | ◎ | `correlation_insights` |
 
 ## データモデル
 
@@ -87,9 +89,9 @@ class CreateImprovementThemes < ActiveRecord::Migration[7.1]
 end
 ```
 
-- 紐付けは既存テーブルへ nullable な参照を追加:
-  - `practice_sessions.improvement_theme_id`（nullable, FK）
-  - `baseball_notes.improvement_theme_id`（nullable, FK）
+- 紐付けは中間テーブルで多対多にする（当初案の nullable FK は複数紐付けに対応できないため差し替えた）:
+  - `practice_session_theme_links`（`practice_session_id` × `improvement_theme_id`、複合ユニーク）
+  - `note_theme_links`（`baseball_note_id` × `improvement_theme_id`、複合ユニーク）
 
 ## API 設計（v2）
 
@@ -100,7 +102,7 @@ end
 | PATCH | `/api/v2/improvement_themes/:id`（状態遷移・克服を含む） |
 | DELETE | `/api/v2/improvement_themes/:id` |
 
-- 練習セッション・ノートの保存ペイロードに `improvement_theme_id` を追加。
+- 練習セッション・ノートの保存ペイロードに `improvement_theme_ids`（配列）を追加。
 
 ---
 
@@ -117,27 +119,43 @@ PRD-05 の F-21「練習量と成績の相関グラフ（Pro/Phase2）」を具�
 
 ## 機能要件
 
-| # | 機能 | 詳細 |
-|---|----|----|
-| FB-01 | インサイトカード生成 | 週次で「練習量/コンディション」と「成績指標」の関係を自然文カードで提示 |
-| FB-02 | 対象の掛け合わせ | 練習量（総素振り数・メニュー別）・睡眠・疲労・体調 × 打率/OPS/三振率/防御率 等 |
-| FB-03 | 課題連携（F-A） | open 課題に紐付く練習量とその課題領域の成績を優先的に相関表示 |
-| FB-04 | データ不足時の扱い | サンプル週が閾値未満なら断定せず「もう少しデータが集まると分かる」表示にする |
-| FB-05 | 根拠の開示 | カードをタップで元の推移（該当週の練習量と成績）を確認できる |
+> UI 上の名称は中高生に伝わる **「練習と成績のつながり」**（front `/insights` / mobile `(insight)`）。以降の「相関インサイト」は同一機能を指す。
+
+| # | 機能 | 詳細 | 実装 |
+|---|----|----|----|
+| FB-01 | インサイトカード生成 | 週次で「練習量/コンディション」と「成績指標」の関係を自然文カードで提示 | 済 |
+| FB-02 | 対象の掛け合わせ | 素振り本数・練習日数・睡眠時間・体調・元気さ／メニュー別練習量 × 打率・出塁率・長打率・OPS・防御率・WHIP・与四球率 | 済 |
+| FB-03 | 課題連携（F-A） | open 課題に紐付く練習量とその課題領域の成績を優先的に相関表示 | **未実装**（課題を入力軸に取れない。「課題→どの成績で測るか」の対応付けが未決のため後回し） |
+| FB-04 | データ不足時の扱い | 突合できた週が閾値未満なら断定せず「もう少しデータが集まると分かる」表示にする | 済（`MIN_PAIRED_WEEKS = 4`、入力値のばらつきが無い場合も同扱い） |
+| FB-05 | 根拠の開示 | カードをタップで元の推移（該当週の練習量と成績）を確認できる | **未実装**（カード内に対象週数と差分は表示。推移グラフへの遷移は未着手） |
+| FB-06 | 自作の組み合わせ | おすすめカードに加え、ユーザーが「入力 × 成績」を自分で選んでカードを追加できる（`insight_combinations`、上限20件） | 済 |
 
 ## 算出方針（要件レベル。詳細は Design Doc）
 
-- 週（JST 月〜日）単位で「入力量（説明変数）」と「成績（目的変数）」を集計し、上位群/下位群の平均差、または相関の符号・強さで文言テンプレを選ぶ。
+- 週（JST 月〜日）単位で「入力量（説明変数）」と「成績（目的変数）」を集計し、上位群/下位群の平均差で文言テンプレを選ぶ。
 - **因果ではなく傾向**であることを明示（誤解を招く断定を避ける）。統計的に弱い/サンプル不足は FB-04 で握りつぶさず正直に出す。
-- 対象成績は既存の集計（打率・OPS・三振率・防御率 等）を再利用。新規指標は作らない。
+- 対象成績は既存の集計（打率・OPS・防御率 等）を再利用。新規指標は作らない。
+- 入力・成績の定義は `back/app/services/insights/catalog.rb` を単一情報源とし、フロントの `constants/insight.ts` とキーを一致させる。
+- 投手指標は登板の無い週を除外するため、登板データがある場合のみ対象にする。
 
 ## 無料 / Pro
 
-| 項目 | 無料 | Pro |
-|----|----|----|
-| 相関インサイト | × | ◎ |
+| 項目 | 無料 | Pro | Entitlement |
+|----|----|----|----|
+| 相関インサイト | × | ◎ | `correlation_insights` |
 
-> 無料では「Pro なら“あなたの素振りと打率の関係”が分かる」と訴求（カード枠だけ見せてロック）。
+> 無料では「Pro なら“あなたの素振りと打率の関係”が分かる」と訴求（サンプルデータのカードを見せてロック）。
+> 自作カードの上限20件は Pro 内での歯止め（`INSIGHT_COMBINATION_LIMIT`）であり、無料/Pro 境界ではない。
+
+## API 設計（v2）
+
+| メソッド | パス |
+|--------|----|
+| GET | `/api/v2/correlation_insights`（おすすめ＋自作カードをまとめて返す。無料は 403） |
+| POST | `/api/v2/insight_combinations` |
+| DELETE | `/api/v2/insight_combinations/:id` |
+
+- 他ユーザーの練習メニューを入力に指定できないよう、`InsightCombination` 側で所有者を検証する（IDOR 防止）。
 
 ---
 
@@ -182,20 +200,23 @@ class CreateReflectionTemplates < ActiveRecord::Migration[7.1]
       t.boolean :is_preset, default: false
       t.boolean :is_default, default: false          # ユーザーの既定テンプレ
       t.integer :sort_order, default: 0
+      t.datetime :archived_at                        # 編集で置き換えられた旧版
+      t.references :origin_template, foreign_key: { to_table: :reflection_templates }
       t.timestamps
     end
   end
 end
 ```
 
-- ノート側は回答を構造化保存する。既存 `baseball_notes` の本文と両立させるため、`reflection_answers`(json: `[{question, answer}]`) と `reflection_template_id`(nullable) を `baseball_notes` に追加する（テンプレ未使用時は従来どおり自由メモ）。
+- ノート側は回答を構造化保存する。既存 `baseball_notes` の本文と両立させるため、`reflection_answers`(jsonb: `[{question, answer}]`) と `reflection_template_id`(nullable) を `baseball_notes` に追加する（テンプレ未使用時は従来どおり自由メモ）。
+- テンプレ編集は破壊的更新ではなく**版管理**にする（`archived_at` / `origin_template_id`）。既存ノートが参照する問い文を後から書き換えると過去の振り返りが読めなくなるため、編集時は旧版を archive して新版を作る。archive 済みは自作テンプレの上限に数えない。
 
 ## 無料 / Pro
 
-| 項目 | 無料 | Pro |
-|----|----|----|
-| プリセットテンプレの利用 | ◎（全プリセット選択可） | ◎ |
-| ユーザー自作テンプレ | 1つまで | 無制限 |
+| 項目 | 無料 | Pro | Entitlement |
+|----|----|----|----|
+| プリセットテンプレの利用 | ◎（全プリセット選択可） | ◎ | - |
+| ユーザー自作テンプレ | 1つまで | 無制限 | `unlimited_reflection_templates` |
 
 > 振り返りの入口は無料でも開けておき（習慣化を優先）、**自作テンプレの複数保有**を Pro レバーにする。
 
@@ -214,13 +235,13 @@ end
 
 ## 機能要件
 
-| # | 機能 | 詳細 |
-|---|----|----|
-| FD-01 | 週次レポート生成 | 週（JST 月〜日）締めで集計: 練習日数・Streak・総量・課題別取組・コンディション平均・成績の前週比 |
-| FD-02 | 月次レポート生成 | 月締めで同様＋「最も伸びた指標」「最も取り組んだ課題」 |
-| FD-03 | 相関インサイト同梱（F-B） | その期間の代表的インサイトカードを1枚同梱 |
-| FD-04 | 次の一手の提案 | 課題進捗・データから軽い提案文（例: 「睡眠が短い週が続いています」） |
-| FD-05 | アプリ内表示 | 起動時に未読レポートをカード/モーダルで表示。バックナンバー閲覧可 |
+| # | 機能 | 詳細 | 実装 |
+|---|----|----|----|
+| FD-01 | 週次レポート生成 | 週（JST 月〜日）締めで集計: 練習日数・活動日数・Streak・総素振り数・課題別取組・コンディション平均・打撃/投球成績の前期比 | 済 |
+| FD-02 | 月次レポート生成 | 月締めで同様 | 済（「最も伸びた指標」「最も取り組んだ課題」の抽出は未実装） |
+| FD-03 | 相関インサイト同梱（F-B） | その期間の代表的インサイトカードを1枚同梱 | 済 |
+| FD-04 | 次の一手の提案 | 課題進捗・データから軽い提案文（例: 「睡眠が短い週が続いています」） | **未実装**（生成方針が未確定のため後回し。下記「後で詰める論点」参照） |
+| FD-05 | アプリ内表示 | 起動時に未読レポートをカード/モーダルで表示。バックナンバー閲覧可 | 済（ホームの `PeriodicReviewBanner` ＋ 一覧画面） |
 
 > 通知方針: PRD-07 同様、MVP では**サーバー push を出さず**アプリ内表示のみ（`#324` 方針に合わせる）。将来 push は延期。
 
@@ -234,7 +255,7 @@ class CreatePeriodicReviews < ActiveRecord::Migration[7.1]
       t.string  :period_type, null: false      # 'weekly' / 'monthly'
       t.date    :period_start, null: false
       t.date    :period_end, null: false
-      t.json    :summary, null: false, default: {}  # 集計スナップショット
+      t.jsonb   :summary, null: false, default: {}  # 集計スナップショット
       t.boolean :read, default: false
       t.timestamps
     end
@@ -243,7 +264,17 @@ class CreatePeriodicReviews < ActiveRecord::Migration[7.1]
 end
 ```
 
-- 生成は `GeneratePeriodicReviewJob`（週次: 毎週月曜早朝 / 月次: 月初早朝、JST）。集計は `activity_logs`・`practice_sessions`・`condition_logs`・成績集計・`improvement_themes` を横断。
+- 生成は `GeneratePeriodicReviewJob`（週次: 毎週月曜 5:00 / 月次: 月初 5:00、`config/recurring.yml`）。集計は `activity_logs`・`practice_sessions`・`condition_logs`・成績集計・`improvement_themes` を横断。
+- レポートは**無料ユーザー分も生成し続ける**（Pro 加入時に過去分をまとめて見せるための蓄積）。閲覧は `PeriodicReviewsController` で Pro のみに絞る。
+
+## API 設計（v2）
+
+| メソッド | パス |
+|--------|----|
+| GET | `/api/v2/periodic_reviews`（無料は空配列） |
+| PATCH | `/api/v2/periodic_reviews/:id`（既読化） |
+
+- v2 の課題テンプレ系は `/api/v2/reflection_templates`（index / create / update / destroy）。
 
 ## 無料 / Pro（実装確定: 2026-07-27）
 
@@ -268,31 +299,32 @@ end
 
 ## テスト要件（抜粋）
 
-- [ ] ImprovementTheme の状態遷移（open→achieved→archived）と集計
-- [ ] 練習セッション/ノートへの課題紐付け・プリセット
-- [ ] ReflectionTemplate の CRUD、プリセット/自作の区別、既定テンプレ
-- [ ] ノートのテンプレ回答保存・問い付き表示
-- [ ] 相関インサイトのサンプル不足時の非断定表示（FB-04）
-- [ ] PeriodicReview の期間境界（JST 週/月）と unique 制約、未読表示
-- [ ] 無料 / Pro の各制限（同時 open 課題数・自作テンプレ数・レポート内訳）
+- [x] ImprovementTheme の状態遷移（open→achieved→archived）と集計
+- [x] 練習セッション/ノートへの課題紐付け・プリセット（無料の1件制限を含む）
+- [x] ReflectionTemplate の CRUD、プリセット/自作の区別、既定テンプレ、編集時の版管理
+- [x] ノートのテンプレ回答保存・問い付き表示
+- [x] 相関インサイトのサンプル不足時の非断定表示（FB-04）
+- [x] PeriodicReview の期間境界（JST 週/月）と unique 制約、未読表示
+- [x] 無料 / Pro の各制限（同時 open 課題数・自作テンプレ数・レポート閲覧可否）
 
 ---
 
 ## 完了の定義（Definition of Done）
 
-- [ ] F-A: 課題の CRUD・状態遷移・記録紐付け・ホーム常設カードが動作
-- [ ] F-B: 相関インサイトカードが生成・表示され、根拠へ遷移できる
-- [ ] F-C: プリセット/自作テンプレの選択・回答保存が動作（「次やること」引き継ぎは将来拡張のため対象外）
-- [ ] F-D: 週次/月次レポートが自動生成され、アプリ内で閲覧できる
-- [ ] 各機能の無料 / Pro 境界が正しく効く
+- [x] F-A: 課題の CRUD・状態遷移・記録紐付け・ホーム常設カードが動作
+- [x] F-B: 相関インサイトカードが生成・表示される（根拠となる推移グラフへの遷移は FB-05 として未着手）
+- [x] F-C: プリセット/自作テンプレの選択・回答保存が動作（「次やること」引き継ぎは将来拡張のため対象外）
+- [x] F-D: 週次/月次レポートが自動生成され、アプリ内で閲覧できる
+- [x] 各機能の無料 / Pro 境界が正しく効く
 
 ---
 
 ## 後で詰める論点
 
-- [ ] 相関インサイトの文言テンプレ・閾値・統計手法の具体化（Design Doc）
-- [ ] 課題（テーマ）とコンディション/成績領域の対応付け（肩の開き→どの成績で測るか）
-- [ ] プリセットテンプレの最終セットと文言
-- [ ] レポートの提案文の生成方針（ルールベース or 将来 LLM）
+- [x] 相関インサイトの文言テンプレ・閾値・統計手法の具体化（実装: `Insights::CardText` / `MIN_PAIRED_WEEKS = 4` の上位群/下位群平均差）
+- [ ] 課題（テーマ）とコンディション/成績領域の対応付け（肩の開き→どの成績で測るか）※ FB-03 の前提
+- [x] プリセットテンプレの最終セットと文言（`db/migrate/*_seed_reflection_template_presets.rb`）
+- [ ] レポートの提案文の生成方針（ルールベース or 将来 LLM）※ FD-04 の前提
+- [ ] 月次レポートの「最も伸びた指標」「最も取り組んだ課題」の抽出ロジック（FD-02 の残）
 - [ ] 保留機能（フォーム比較・コーチ共有）の Phase 化
 - [ ] FC-05「次やること」引き継ぎの再設計（表示だけでなく消化のライフサイクル: 練習記録で消える / 直近ノート1件のみ参照 など）

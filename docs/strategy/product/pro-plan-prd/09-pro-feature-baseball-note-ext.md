@@ -1,8 +1,8 @@
 # PRD-09: 野球ノート拡張（画像・動画アップロード + 試合 / 練習 紐付け）
 
 **作成日**: 2026-05-12
-**最終更新**: 2026-07-20（実装設計確定。着手: `feature/325-note-media-back` / `feature/325-note-media-mobile`）
-**ステータス**: 実装中
+**最終更新**: 2026-08-11（実装完了に伴い実装内容へ追随。back / mobile / front とも `release/pro-202605` に実装済み）
+**ステータス**: 実装済み
 **親ドキュメント**: `../pro-plan-prd-202605.md`
 **前提PRD**: `01-system-architecture.md`
 **設計**: [`../pro-plan-design/03-ux-information-architecture.md`](../pro-plan-design/03-ux-information-architecture.md) §4〜§5
@@ -43,14 +43,58 @@
 - アップロード上限は**点数制限**を採用（合計サイズ制限は不採用）
   - 理由: R2 はストレージ激安・エグレス無料、かつ無料は480p/30秒で1点が小さく（〜10-15MB）サイズで縛る実利が薄い。点数の方が分かりやすく Pro 転換レバーとして強い
 - **保存期間は無料・Pro とも永続**（無料の30日自動削除は撤回。F-11 と `CleanupExpiredMediaJob` による無料ユーザーの期限切れ削除は不採用。`media_attachments.expires_at` は実質未使用）。R2 はストレージ激安のため永続でもコスト影響は小さい
-- **無料**: 月3点（画像・動画合算）/ 動画30秒 / 480p / 画像5MB / 永続
-- **Pro**: 無制限 / 動画180秒(3分) / 1080p / 画像10MB / 永続
+- **無料**: 月3点（画像・動画合算）/ 動画30秒 / 長辺480px / 画像5MB / 永続
+- **Pro**: 無制限 / 動画180秒(3分) / 長辺1280px / 画像10MB / 永続
 - 再生時の**透かしロゴ(F-14)は無料でも付けない**（自己フォーム確認の用途を損ねるため撤回）
 - 上限到達モーダルは **Pro 加入導線のみ**（リワード広告ボタンは撤去。広告は対象外）
 
 ### プラットフォーム
 
-- アップロードは **mobile 優先**（カメラ・録画が主）。閲覧・再生は既存ノート画面。Web 対応は将来
+- アップロードは **mobile 優先**（カメラ・録画が主）。閲覧・再生は既存ノート画面
+- Web（front）も同じ署名URL方式で**実装済み**（`app/utils/media/` に選択・圧縮・サムネ生成・アップロードのパイプラインを実装）
+
+---
+
+## 実装反映（2026-08-11）
+
+実装完了時点のコードを正とした差分。以降の全セクションと矛盾する場合は**本セクションを優先**する。
+
+### 上限値
+
+- Pro の動画解像度は「1080p」ではなく **長辺1280px**（`MediaAttachments::LimitValidator::PRO_VIDEO_MAX_HEIGHT = 1280`）。無料は **長辺480px**。クライアントが長辺基準で縮小するため、縦持ち・横持ちどちらでも `max(width, height)` で判定する（back / front / mobile の3か所で同じ定数を持つ）
+- Pro 動画の圧縮ビットレートは 3Mbps 固定（`PRO_VIDEO_BITRATE_BPS`）、無料は自動算出
+- 画像は**バイト数のみ**を検証（無料5MB / Pro 10MB）。「4Kまで」の解像度上限と、動画の 100MB / 200MB というファイルサイズ上限は**サーバー側では強制していない**（長さ・解像度で実質的に抑えられるため）
+
+### メディア単位のメモ（F-05 の拡張）
+
+`media_attachments.memo` カラムを追加し、**メディア1点ごとにメモを付けられる**（当初の「メモは既存野球ノート本文を流用」から拡張）。サムネイル上には未記入なら記入を促す文言、記入済みなら内容のプレビューを重ねる（`buildMediaMemoLabel`、front / mobile 共通表記）。
+
+### API（実装版）
+
+| メソッド | パス | 用途 |
+|--------|----|----|
+| POST | `/api/v2/media_attachments/presign` | 署名URL発行。月間上限到達時は **403 + `{ error: ... }`**、非対応 content_type は 422 |
+| PATCH | `/api/v2/media_attachments/:id` | **完了通知とメモ更新を兼ねる**。`file_size_bytes` を含むかで意図を判別し、完了通知は `status: pending` のときの一度きり |
+| DELETE | `/api/v2/media_attachments/:id` | 削除（本人のみ） |
+
+- 一覧取得用の GET は**作らない**。メディアはノートのシリアライザ（`V2::BaseballNoteSerializer`）に同梱して返す
+- `media_type` ごとに許可する `content_type` を分ける（image に `video/mp4` を渡して動画の長さ・解像度チェックを回避されるのを防ぐ）
+- 完了通知で受け取る `file_size_bytes` / `duration_seconds` / `width` / `height` はクライアントの自己申告値のため信用せず、**R2上の実体から読み直した値で上書きしてから**上限検証する（`ObjectSizeFetcher` / `VideoMetadataFetcher`）。実体が無い・動画を解析できない場合は `status: failed` にして 422
+
+### 削除・回収ジョブ
+
+`CleanupExpiredMediaJob`（無料の30日削除）は不採用のまま。代わりに以下2つを実装した。
+
+- `MediaAttachmentDeletionJob`: レコード destroy 後の `after_commit` で R2 オブジェクトを非同期削除
+- `PurgeStaleMediaAttachmentsJob`: 毎日04:00（`config/recurring.yml`）。presign 後にクラッシュ・通信断で完了通知が来なかった `pending` / `failed` のうち24時間以上経過したものを destroy し、R2の残骸を回収する
+
+### 無料枠カウント
+
+`media_attachments_count_this_month` は実カウント済み（当月 `created_at` かつ `status != 'failed'`）。加えて**1時間以上前の `pending` も除外**し、中断したアップロードが無料枠を食い潰さないようにしている。
+
+### entitlement
+
+`media_long_term_storage` は `PRO_FEATURES` から削除済み。Paywall比較表の「保存期間」行も front / mobile とも削除済み。
 
 ---
 
@@ -174,7 +218,7 @@ add_index :media_attachments, [:user_id, :created_at]  # 月間カウント集�
 | F-02 | 動画アップロード | mp4, mov（無料30秒・Pro 180秒(3分)、最大100MB） |
 | F-03 | サムネイル自動生成 | 動画はファーストフレーム |
 | F-04 | 試合と紐付け | game_results との関連 |
-| F-05 | メモ機能 | 既存野球ノートを流用 |
+| F-05 | メモ機能 | 既存野球ノート本文に加え、メディア1点ごとの `memo` も持つ |
 | F-06 | タイムライン表示 | 日付順に並べて閲覧 |
 | F-07 | 試合詳細から関連メディア表示 | 試合ページで紐付くメディア一覧 |
 | F-08 | フルスクリーン再生 | 動画再生 |
@@ -187,7 +231,7 @@ add_index :media_attachments, [:user_id, :created_at]  # 月間カウント集�
 | F-10 | 画像・動画アップロード月間上限 | 3点まで | 無制限 |
 | F-11 | 保管期間 | 30日後に自動削除 | 永続保存 |
 | F-12 | 動画最大長 | 30秒 | 180秒(3分) |
-| F-13 | 動画解像度 | 480p | 1080p |
+| F-13 | 動画解像度 | 長辺480px | 長辺1280px |
 | F-14 | フルスクリーン再生 | △ 透かしロゴ表示 | ◎ 透かしなし |
 
 ---
@@ -427,23 +471,24 @@ Pro ユーザーは `expires_at = NULL`。
 
 ## 完了の定義（Definition of Done）
 
-- [ ] 画像・動画のアップロードが動作（R2署名URL方式）
-- [ ] サムネイル自動生成（クライアント側 `expo-video-thumbnails`）
-- [ ] 動画のクライアント側圧縮が動作（`react-native-compressor`、dev client）
-- [ ] 試合・練習（日単位 / `practice_log_id`）との紐付け表示（紐付け自体は実装済み、メディア表示のみ追加）
-- [ ] 無料は月3点・480p/30秒・画像5MB・永続、Pro は無制限・1080p/180秒(3分)・画像10MB・永続
-- [ ] サーバー側でも無料/Pro上限を再検証（クライアント側チェックのバイパス対策）
-- [ ] `media_attachments_count_this_month` を実カウントに差し替え
-- [ ] `media_long_term_storage` entitlementキーを削除、Paywall比較表から該当行を削除
-- [ ] フルスクリーン再生（mobile。web は将来）
+- [x] 画像・動画のアップロードが動作（R2署名URL方式）
+- [x] サムネイル自動生成（mobile は `expo-video-thumbnails`、front はブラウザ側でフレーム抽出）
+- [x] 動画のクライアント側圧縮が動作（mobile は `react-native-compressor`＋dev client、front は `videoResize`）
+- [x] 試合・練習（日単位 / `practice_log_id`）との紐付け表示（紐付け自体は実装済み、メディア表示のみ追加）
+- [x] 無料は月3点・長辺480px/30秒・画像5MB・永続、Pro は無制限・長辺1280px/180秒(3分)・画像10MB・永続
+- [x] サーバー側でも無料/Pro上限を再検証（クライアント側チェックのバイパス対策。R2の実体から読み直して検証）
+- [x] `media_attachments_count_this_month` を実カウントに差し替え
+- [x] `media_long_term_storage` entitlementキーを削除、Paywall比較表から該当行を削除
+- [x] フルスクリーン再生（mobile `MediaViewer`。front もノート詳細で再生対応）
+- [x] メディア1点ごとのメモ記入・編集
 
 ---
 
 ## 後で詰める論点
 
-- [ ] R2バケット・CDNドメイン（`media.buzzbase.jp`想定）の用意、環境変数設計
-- [ ] `aws-sdk-s3` gemの導入・presigned URL発行の実装詳細
-- [ ] EAS Build dev client のCI/配布フロー整備（`react-native-compressor`導入に伴う）
+- [x] R2バケット・CDNドメインの用意、環境変数設計（`R2_ENDPOINT` / `R2_BUCKET_NAME` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`）
+- [x] `aws-sdk-s3` gemの導入・presigned URL発行の実装（`MediaAttachments::PresignedUrlService`、PUT有効期限10分）
+- [x] EAS Build dev client のCI/配布フロー整備（`react-native-compressor`導入に伴う）
 - [ ] SNS シェア時の透かし入り動画生成
 - [ ] AI による動画解析（Phase 4）
 - [ ] フォーム比較機能（2動画並べて再生）（Phase 2）

@@ -1,7 +1,7 @@
 # PRD-04: GitHub 草機能（ヒートマップカレンダー）
 
 **作成日**: 2026-05-12
-**最終更新**: 2026-07-29（F-05/F-06/F-11・F-13の実装状況を追記。詳細は「実装状況」節参照）
+**最終更新**: 2026-08-11（実装（release/pro-202605）に合わせてデータモデル・API・Streak集計を修正）
 **ステータス**: 実装済み（F-01〜F-04, F-07〜F-10）。F-05/F-06/F-11・F-13は見送り・対象外
 **親ドキュメント**: `../pro-plan-prd-202605.md`
 **前提PRD**: `01-system-architecture.md`
@@ -99,7 +99,7 @@ F-13（草の画像エクスポート）は上記2件とは別に、当初から
 | F-05 | 月別ナビゲーション | 月単位でスクロール | 見送り（issue #446、不要と判断しPRクローズ） |
 | F-06 | 日付タップで詳細 | その日の練習内容を表示 | 見送り（issue #446、不要と判断しPRクローズ） |
 | F-07 | Streak が途切れた時の通知 | 「今日まだ練習していません」プッシュ通知 | 実装済み（端末ローカル通知のみ。サーバー側是正はissue #447で見送り） |
-| F-08 | 累計サマリーカード | プロフィールに表示可能 | 実装済み |
+| F-08 | 累計サマリーカード | ホーム（mobile）／ダッシュボード（Web）の活動タブ「継続」セクションに表示。プロフィール画面には出していない | 実装済み |
 
 ### Pro機能（無料との差別化）
 
@@ -115,67 +115,62 @@ F-13（草の画像エクスポート）は上記2件とは別に、当初から
 
 ## データモデル
 
-### activity_logs テーブル（新規 or 集計ビュー）
+### activity_logs テーブル（案A: 集計テーブルで実装済み）
 
-既存テーブル（practice_logs, game_results, shadow_swing_sessions）から集計するか、
-パフォーマンスのため集計テーブルを用意する。
-
-#### 案A: 集計テーブル
+案B（都度 SQL 集計）は不採用。`practice_logs` / `match_result` の `after_commit` から
+`Activities::DailyActivityRecalculator` を呼び、該当日の1行を再計算する（冪等）。
 
 ```ruby
-class CreateActivityLogs < ActiveRecord::Migration[7.0]
-  def change
-    create_table :activity_logs do |t|
-      t.references :user, null: false, foreign_key: true
-      t.date :activity_date, null: false
-      t.integer :activity_count, default: 0   # その日のアクティビティ総数
-      t.integer :intensity_level, default: 0  # 0:なし, 1:軽い, 2:普通, 3:多い, 4:非常に多い
-      t.json :sources                         # {"practice": 2, "game": 1, "shadow_swing": 200}
-      t.timestamps
-    end
-
-    add_index :activity_logs, [:user_id, :activity_date], unique: true
-  end
+create_table :activity_logs do |t|
+  t.bigint  :user_id, null: false
+  t.date    :activity_date, null: false
+  t.integer :practice_menu_count, default: 0, null: false  # その日の distinct メニュー数
+  t.integer :total_swing_count, default: 0, null: false     # その日の素振り本数
+  t.boolean :has_game, default: false, null: false          # その日に試合があったか
+  t.integer :intensity_level, default: 0, null: false       # 0〜4
+  t.timestamps
 end
+
+add_index :activity_logs, [:user_id, :activity_date], unique: true
 ```
 
-#### 案B: 既存テーブルから集計（ビューまたはクエリ）
+- 当初案の `activity_count` は `practice_menu_count`（distinct メニュー数）に置き換え、`sources`（json）は**採用しなかった**。内訳は `practice_menu_count` / `total_swing_count` / `has_game` の3カラムで持つ
+- **強度0の日は行を作らず、既存行があれば削除する**。「レコードが存在する日＝活動した日」という不変条件があるため、Streak 判定は `intensity_level` を見ずに日付の存在だけで済む
 
-毎回 SQL で集計（パフォーマンス次第で案Aへ移行）
+### 再計算ロジック（`Activities::DailyActivityRecalculator`）
 
-### Streak 集計
+- `practice_menu_count`: その日の練習ログを `COALESCE(practice_menu_id::text, menu_name)` で distinct カウント。メニュー削除後も名前スナップショットで識別する。`amount` が明示的に 0 のログは「やっていない」の記録なので数えない（`amount` nil は数値を伴わないメニューの実施記録なので数える）
+- `total_swing_count`: `practice_logs`（`source: 'shadow_swing'`）の `amount` 合計。`shadow_swing_sessions` は参照しない（二重計上を避けるため）
+- `has_game`: その JST 日に `game_result` に紐づく `match_result` が存在するか
+- 日付バケットは JST。`practice_logs.logged_on`（JST 日付）をそのまま使う
+- コンディションログ（`condition_logs`）は集計対象外
 
-```ruby
-class User < ApplicationRecord
-  def current_streak_days
-    # 今日から逆に遡って連続日数をカウント
-    activity_logs
-      .where('activity_date <= ?', Date.current)
-      .order(activity_date: :desc)
-      .each_with_index do |log, index|
-        expected_date = Date.current - index.days
-        return index if log.activity_date != expected_date
-      end
-  end
+### Streak 集計（`Activities::StreakCalculator`）
 
-  def longest_streak_days
-    # 最長連続記録
-  end
-end
-```
+`User` のメソッドではなくサービスとして実装。`activity_logs` の日付集合だけを見て算出する。
+
+- `current`: **当日まだ未活動でも、前日まで連続していれば継続中として数える**（その日が終わるまで途切れ扱いにしない）
+- `longest`: 日付を昇順に並べて連続区間の最大長
+- `total_active_days`: 活動日の総数
 
 ---
 
 ## API 設計
 
+v2（`Api::V2::ActivityLogsController`）で実装。累計サマリーは streak エンドポイントに含めたため専用 API は作らず、
+再集計は書き込み時の `after_commit` で行うため管理用の強制再集計 API も作っていない。
+
 | メソッド | パス | 用途 |
 |--------|----|----|
-| GET | `/api/v1/activity/heatmap?from=&to=` | 期間内のヒートマップデータ |
-| GET | `/api/v1/activity/streak` | 現在の連続日数、最長記録 |
-| GET | `/api/v1/activity/summary` | 累計サマリー |
-| POST | `/api/v1/activity/recalculate` | 強制再集計（管理用） |
+| GET | `/api/v2/activity_logs?from=&to=` | 期間内のヒートマップデータ＋Streak |
+| GET | `/api/v2/activity_logs/streak` | 現在の連続日数・最長記録・累計活動日数 |
 
-### GET /api/v1/activity/heatmap
+### GET /api/v2/activity_logs
+
+- 既定期間は直近365日（`from` 省略時は `today - 364`、`to` 省略時は当日）
+- **無料ユーザーは `from` を直近30日にクランプしてから 200 を返す**（403 は返さない）。レスポンスの `from` / `to` はクランプ**後**の実際の集計期間なので、クライアントは要求値ではなくこの値を描画範囲の正とする
+- `current_streak_days` / `longest_streak_days` / `total_active_days` は期間クランプの影響を受けず、常に全期間で算出する
+- 活動が無かった日は行が存在しないため、日付の穴埋めはクライアント側で行う
 
 レスポンス:
 ```json
@@ -187,14 +182,12 @@ end
   "total_active_days": 45,
   "data": [
     {
-      "date": "2026-05-01",
+      "activity_date": "2026-05-01",
       "intensity_level": 3,
-      "sources": {
-        "practice": 1,
-        "shadow_swing_count": 200
-      }
-    },
-    ...
+      "has_game": false,
+      "total_swing_count": 200,
+      "practice_menu_count": 1
+    }
   ]
 }
 ```
@@ -256,13 +249,18 @@ end
 
 ## 強度レベルの定義
 
+「アクティビティ」= その日の distinct 練習メニュー数。
+強度は **メニュー数の軸と素振り本数の軸を独立に L0〜L4 へ写像し、その最大値**を採る。試合があればその時点で L4。
+
 | レベル | 色 | 条件 |
 |------|--|----|
-| 0 | グレー | 練習なし |
-| 1 | 薄緑 | 1アクティビティ |
-| 2 | 中緑 | 2アクティビティ or 素振り100本以上 |
-| 3 | 濃緑 | 3アクティビティ or 素振り300本以上 |
-| 4 | 最濃緑 | 4アクティビティ以上 or 素振り500本以上 or 試合あり |
+| 0 | グレー（＝レコードなし） | 練習なし |
+| 1 | 薄緑 | メニュー1種 |
+| 2 | 中緑 | メニュー2種 or 素振り100本以上 |
+| 3 | 濃緑 | メニュー3種 or 素振り300本以上 |
+| 4 | 最濃緑 | メニュー4種以上 or 素振り500本以上 or 試合あり |
+
+閾値はすべて back（`Activities::DailyActivityRecalculator`）が持ち、front / mobile は `intensity_level` を色とラベルへ写すだけにする。
 
 ---
 
@@ -270,10 +268,12 @@ end
 
 | ケース | 対応 |
 |------|----|
-| 過去データを後から追加 | activity_logs を再集計 |
-| 同じ日に複数アクティビティ | activity_count を増やす、source に集約 |
-| タイムゾーンを跨ぐ記録 | ユーザーのタイムゾーン（JST）で集計 |
+| 過去データを後から追加・編集 | その日の activity_logs を after_commit で再計算 |
+| 同じ日に複数アクティビティ | distinct メニュー数・素振り合計本数・試合有無をそれぞれ再集計 |
+| 記録を消して活動が無くなった日 | 強度0になるため activity_logs の行を削除する |
+| タイムゾーンを跨ぐ記録 | JST で集計（`practice_logs.logged_on` をそのまま使う） |
 | Pro解約後 | 直近30日のみ表示に切り替え（過去データは保持） |
+| 無料ユーザーが全期間を要求 | 403 ではなく直近30日にクランプして 200 を返し、クランプの事実は `from` の比較で検出させる |
 
 ---
 
@@ -296,11 +296,11 @@ end
 
 ## 完了の定義（Definition of Done）
 
-- [ ] ヒートマップが正しく表示される
-- [ ] Streak が正しく計算される
-- [ ] 強度レベルが直感的にわかる色配色
-- [ ] 無料は30日、Pro は全期間表示
-- [ ] 練習記録 / 試合 / 素振りすべてが反映される
+- [x] ヒートマップが正しく表示される（mobile / Web 両方）
+- [x] Streak が正しく計算される
+- [x] 強度レベルが直感的にわかる色配色
+- [x] 無料は30日、Pro は全期間表示（サーバー側でクランプ）
+- [x] 練習記録 / 試合 / 素振りすべてが反映される
 - [ ] パフォーマンス（1年分のデータ取得が3秒以内）
 
 ---
@@ -310,5 +310,5 @@ end
 - [x] 集計テーブル（案A）vs ビュー（案B）の判断 → 案A（集計テーブル）で確定・実装済み
 - [x] Streak が途切れた時のプッシュ通知のトーン → 実装済み（端末ローカル通知、サーバー側是正はissue #447で見送り）
 - [x] SNS シェア画像のデザイン → F-13自体を対象外としたため検討不要に
+- [x] Web 版でも提供するか → 提供する（ダッシュボードの継続セクションで実装済み）
 - [ ] 強度レベルの閾値の調整
-- [ ] Web 版でも提供するか

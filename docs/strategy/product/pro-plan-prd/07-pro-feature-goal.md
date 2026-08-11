@@ -1,8 +1,8 @@
 # PRD-07: 目標設定 + 達成管理
 
 **作成日**: 2026-05-12
-**最終更新**: 2026-06-27（配置・通知の扱い・期限確定を確定）
-**ステータス**: ドラフト（実装直前に詳細化）
+**最終更新**: 2026-08-11（実装内容に合わせて期間タイプ・目標種類・指標・API・バッジを更新）
+**ステータス**: 実装済み（back / front / mobile）
 **親ドキュメント**: `../pro-plan-prd-202605.md`
 **前提PRD**: `01-system-architecture.md`
 **設計**: [`../pro-plan-design/03-ux-information-architecture.md`](../pro-plan-design/03-ux-information-architecture.md) §1, §7
@@ -17,9 +17,27 @@
 
 ---
 
-## UI/UX 確定事項（2026-06-27）
+## 実装確定事項（2026-08-11）
 
-設計検討で確定。以降の「機能要件」「UI 仕様」と差異がある場合は**本セクションを優先**する。
+実装に合わせた最終仕様。以降の「機能要件」「UI 仕様」と差異がある場合は**本セクションを優先**する。
+
+### 期間タイプ（6種）
+
+当初の season / monthly の2種から拡張し、`Goal::PERIOD_TYPES` = `season` / `monthly` / `tournament` / `weekly` / `yearly` / `custom` の6種で運用する。
+
+- `monthly` / `weekly` / `yearly` は期間を自動設定（今月 / 今週 月〜日 / 今年 1〜12月）
+- `custom` は開始日（`month_start`）と期限（`deadline`）をユーザーが指定する
+- `season` は `seasons`、`tournament` は `tournaments` に紐付け、その対象の試合の最小〜最大日時を集計期間とする
+
+### 目標の種類（kind・3種）
+
+指標を自動集計できない目標も扱えるよう `kind` を導入した。
+
+| kind | 内容 | 現在値の決まり方 |
+|---|---|---|
+| `numeric` | 数値目標（打率3割・今月20日練習 等） | `Goals::MetricCalculator` が自動集計 |
+| `qualitative` | 達成目標（大会優勝・レギュラー獲得 等） | 数値を持たず、ユーザーが達成ボタンで切り替え |
+| `manual` | 自由指標（球速・体重 等） | `custom_metric_label` / `custom_unit` を自分で定義し、`manual_current_value` を手入力 |
 
 ### 配置
 
@@ -37,12 +55,14 @@
 
 ### 指標
 
-- MVP は PRD の指標一覧（成績系＋行動系）。新分析指標（状況別打率・打球の質・球種別 等）は将来追加の余地として保留
+- 自動集計する指標は `Goal::METRIC_KEYS`（下記「目標指標の一覧」）。新分析指標（状況別打率・打球の質・球種別 等）は将来追加の余地として保留
+- 達成条件（`comparison_type`）は指標ごとに固定でクライアントが決め、ユーザーには選ばせない（防御率・WHIP は「以下」）
 
-### 無料 / Pro（2026-06-27 更新）
+### 無料 / Pro（2026-08-11 更新）
 
-- 無料: 月次目標 **2つ**まで / Pro: シーズン＋月次 無制限（F-11 の「1つまで」を更新）
-- 目標履歴閲覧: **無料も全期間**（F-13 の「直近1ヶ月」を撤回）
+- 個人の期間目標（`monthly` / `weekly` / `yearly` / `custom`）は**無料枠を合算して 2件**まで（`MONTHLY_GOAL_FREE_LIMIT = 2`、進行中のみカウント）。Pro は `unlimited_monthly_goals` で無制限
+- `season` / `tournament` / `custom` / 自由指標（`manual`）は **Pro 限定**（`season_goals` / `tournament_goals` / `custom_period_goals` / `manual_metric_goals`）
+- 目標履歴閲覧・達成バッジ: **無料も全期間・全種類**（F-13 の「直近1ヶ月」、F-14 の「基本のみ」を撤回）
 
 ---
 
@@ -77,104 +97,117 @@
 
 ### 必須機能
 
-| # | 機能 | 詳細 |
-|---|----|----|
-| F-01 | シーズン目標設定 | 既存 `seasons` テーブルに紐付け |
-| F-02 | 月次目標設定 | カレンダー月単位 |
-| F-03 | 目標指標の選択 | 打率、OPS、防御率、試合数、練習日数、素振り本数 等 |
-| F-04 | 目標値の入力 | 数値入力 |
-| F-05 | 達成度プログレスバー | リアルタイム計算 |
-| F-06 | 期限到来時の自動判定 | 月末・シーズン終了で達成/未達確定 |
-| F-07 | 達成バッジ | 達成時にバッジ獲得 |
-| F-08 | 達成履歴 | 過去の目標達成記録 |
-| F-09 | 目標一覧画面 | アクティブな目標を一覧表示 |
-| F-10 | 達成度の通知 | 「目標達成まで90%」プッシュ通知 |
+| # | 機能 | 詳細 | 状態 |
+|---|----|----|----|
+| F-01 | シーズン目標設定 | 既存 `seasons` テーブルに紐付け | 実装済み |
+| F-02 | 期間目標設定 | 月次に加えて週次・年間・カスタム期間・大会 | 実装済み |
+| F-03 | 目標指標の選択 | 打率、OPS、防御率、試合数、練習日数、素振り本数 等（下記一覧） | 実装済み |
+| F-04 | 目標値の入力 | 数値入力（`qualitative` は目標値なし） | 実装済み |
+| F-05 | 達成度プログレスバー | 参照時にリアルタイム計算（`Goals::ProgressCalculator`） | 実装済み |
+| F-06 | 期限到来時の自動判定 | `FinalizeGoalsJob` が毎日 00:10 に確定 | 実装済み |
+| F-07 | 達成バッジ | 確定時に達成していればバッジ付与 | 実装済み |
+| F-08 | 達成履歴 | `GET /api/v2/goals/history`（確定済みのみ） | 実装済み |
+| F-09 | 目標一覧画面 | 進行中 / 達成 / 未達のタブで一覧表示 | 実装済み |
+| F-10 | 達成度の通知 | 「目標達成まで90%」プッシュ通知 | **未実装**（MVP 不採用・将来延期） |
+| F-16 | 定性目標の手動達成 | `POST/DELETE /api/v2/goals/:id/achievement` | 実装済み |
+| F-17 | 自由指標の現在値更新 | `manual_current_value` を PATCH で更新 | 実装済み |
 
 ### Pro機能（無料との差別化）
 
-| # | 機能 | 無料 | Pro |
-|---|----|----|----|
-| F-11 | 月次目標の設定 | 1つまで | 無制限 |
-| F-12 | シーズン目標の設定 | × | ◎ |
-| F-13 | 目標履歴の閲覧 | 直近1ヶ月 | 全期間 |
-| F-14 | 達成バッジ獲得 | △ 基本のみ | ◎ 全種類 |
-| F-15 | 目標達成度の詳細ダッシュボード | × | ◎ |
+| # | 機能 | 無料 | Pro | Entitlement |
+|---|----|----|----|----|
+| F-11 | 個人の期間目標（月次/週次/年間/カスタム）の同時設定数 | 合算2つまで | 無制限 | `unlimited_monthly_goals` |
+| F-12 | シーズン目標の設定 | × | ◎ | `season_goals` |
+| F-13 | 大会目標の設定 | × | ◎ | `tournament_goals` |
+| F-14 | カスタム期間の目標設定 | × | ◎ | `custom_period_goals` |
+| F-15 | 自由指標（手動更新）の目標設定 | × | ◎ | `manual_metric_goals` |
+
+目標履歴の閲覧・達成バッジの獲得は無料・Pro で差を付けない。Pro 限定の詳細ダッシュボードも設けず、目標一覧と達成サマリーを共通で提供する。
 
 ---
 
 ## 目標指標の一覧
 
+`Goal::METRIC_KEYS` / `Goals::MetricCalculator::DISPATCH` と一致する（`kind = numeric` のみ使用）。
+
 ### 成績系
 
-| 指標 | 単位 | 集計元 |
-|----|----|-----|
-| 打率 | float | batting_averages |
-| OPS | float | 同上 |
-| 出塁率 | float | 同上 |
-| 長打率 | float | 同上 |
-| 本塁打 | integer | 同上 |
-| 打点 | integer | 同上 |
-| 防御率 | float | pitching_results |
-| WHIP | float | 同上 |
-| 勝利数 | integer | 同上 |
-| 奪三振 | integer | 同上 |
+| metric_key | 指標 | 単位 | 集計元 |
+|----|----|----|-----|
+| `batting_average` | 打率 | float | batting_averages |
+| `ops` | OPS | float | 同上 |
+| `on_base_percentage` | 出塁率 | float | 同上 |
+| `slugging_percentage` | 長打率 | float | 同上 |
+| `hits` | 安打 | integer | 同上 |
+| `home_runs` | 本塁打 | integer | 同上 |
+| `runs_batted_in` | 打点 | integer | 同上 |
+| `runs_scored` | 得点 | integer | 同上 |
+| `stolen_bases` | 盗塁 | integer | 同上 |
+| `era` | 防御率 | float | pitching_results |
+| `whip` | WHIP | float | 同上 |
+| `strikeouts` | 奪三振 | integer | 同上 |
+| `wins` | 勝利数 | integer | 同上 |
+| `saves` | セーブ | integer | 同上 |
+
+`era` / `whip` は登板がない場合を `nil`（データなし）で扱い、真の 0.00 と区別する。API では互換のため 0 で返す。
 
 ### 行動系
 
-| 指標 | 単位 | 集計元 |
-|----|----|-----|
-| 試合数 | integer | game_results |
-| 練習日数 | integer | practice_logs（distinct） |
-| 練習総時間 | minutes | practice_logs |
-| 素振り総本数 | integer | shadow_swing_sessions |
-| ランニング総距離 | km | practice_logs |
-| 連続練習日数 | integer | activity_logs |
+| metric_key | 指標 | 単位 | 集計元 |
+|----|----|----|-----|
+| `game_count` | 試合数 | integer | match_results |
+| `practice_days` | 練習日数 | integer | activity_logs（`intensity_level >= 1` の日数） |
+| `total_swing_count` | 素振り総本数 | integer | practice_logs（`source = shadow_swing`） |
+| `menu_practice_days` | メニュー継続日数 | integer | practice_logs（対象メニューを実施した distinct 日数） |
+
+練習総時間・ランニング総距離・連続練習日数は指標としては未実装。継続性は `menu_practice_days`（特定メニューの実施日数）で代替している。
 
 ---
 
 ## データモデル
 
-### goals テーブル（新規）
+### goals テーブル
 
 ```ruby
-class CreateGoals < ActiveRecord::Migration[7.0]
-  def change
-    create_table :goals do |t|
-      t.references :user, null: false, foreign_key: true
-      t.string :title, null: false
-      t.string :period_type, null: false   # 'season' or 'monthly'
-      t.references :season, foreign_key: true, null: true
-      t.date :month_start                  # 月次目標の場合
-      t.date :deadline, null: false
-      t.string :metric_key, null: false    # 'batting_average', 'practice_days' 等
-      t.float :target_value, null: false
-      t.string :comparison_type, default: 'greater_than'  # 'greater_than' or 'less_than'（防御率等）
-      t.float :achieved_value
-      t.datetime :achieved_at
-      t.boolean :is_achieved, default: false
-      t.boolean :is_finalized, default: false  # 期限後にロック
-      t.timestamps
-    end
-
-    add_index :goals, [:user_id, :period_type, :is_finalized]
-  end
+create_table :goals do |t|
+  t.references :user, null: false, foreign_key: true
+  t.string :title, null: false                        # 最大60文字
+  t.string :period_type, null: false                  # season / monthly / tournament / weekly / yearly / custom
+  t.string :kind, null: false, default: 'numeric'     # numeric / qualitative / manual
+  t.references :season, null: true                    # season 目標のみ
+  t.references :tournament, null: true                # tournament 目標のみ
+  t.references :practice_menu, null: true             # metric_key = menu_practice_days のとき必須
+  t.date :month_start                                 # 月次の開始月 / weekly・yearly・custom の開始日
+  t.date :deadline, null: false
+  t.string :metric_key                                # numeric のみ必須
+  t.float :target_value                               # qualitative 以外は必須・0以上
+  t.string :comparison_type, null: false, default: 'greater_than'  # greater_than / less_than
+  t.string :custom_metric_label                       # manual のみ必須（最大40文字）
+  t.string :custom_unit                               # manual の単位表示
+  t.float :manual_current_value, null: false, default: 0.0
+  t.float :achieved_value
+  t.datetime :achieved_at
+  t.boolean :is_achieved, null: false, default: false
+  t.boolean :is_finalized, null: false, default: false  # 期限後に確定
+  t.timestamps
 end
+
+add_index :goals, [:user_id, :period_type, :is_finalized]
 ```
 
-### goal_badges テーブル（新規、達成バッジ管理）
+`season_id` / `practice_menu_id` は自分の所有レコードのみ指定できるようモデル側でバリデートする（IDOR 防止）。
+
+### goal_badges テーブル（達成バッジ管理）
 
 ```ruby
-class CreateGoalBadges < ActiveRecord::Migration[7.0]
-  def change
-    create_table :goal_badges do |t|
-      t.references :user, null: false, foreign_key: true
-      t.references :goal, foreign_key: true
-      t.string :badge_type             # 'season_achieved', 'monthly_achieved', 'streak_3months'
-      t.string :badge_name
-      t.datetime :awarded_at, null: false
-      t.timestamps
-    end
-  end
+create_table :goal_badges do |t|
+  t.references :user, null: false, foreign_key: true
+  t.references :goal, null: true            # 目標削除時は nullify（バッジは恒久保存）
+  t.string :badge_type, null: false         # 'season_achieved' / 'monthly_achieved' / 'tournament_achieved'
+  t.string :badge_name, null: false
+  t.string :goal_title, null: false         # 付与時のスナップショット
+  t.datetime :awarded_at, null: false
+  t.timestamps
 end
 ```
 
@@ -182,39 +215,55 @@ end
 
 ## API 設計
 
-| メソッド | パス |
-|--------|----|
-| GET | `/api/v1/goals` |
-| POST | `/api/v1/goals` |
-| PATCH | `/api/v1/goals/:id` |
-| DELETE | `/api/v1/goals/:id` |
-| GET | `/api/v1/goals/active` |
-| GET | `/api/v1/goals/history` |
-| POST | `/api/v1/goals/finalize` |（バッチで期限到来分を一括処理）|
+| メソッド | パス | 内容 |
+|--------|----|----|
+| GET | `/api/v2/goals` | 進行中（`is_finalized = false`）の目標を期限昇順で返す |
+| POST | `/api/v2/goals` | 作成。無料枠超過・Pro 限定は 403 |
+| PATCH | `/api/v2/goals/:id` | タイトル・期間・目標値・自由指標の現在値のみ更新可 |
+| DELETE | `/api/v2/goals/:id` | 削除（バッジは残る） |
+| GET | `/api/v2/goals/history` | 確定済み（達成・未達）を期限降順で返す |
+| POST | `/api/v2/goals/:goal_id/achievement` | 定性目標を達成にする |
+| DELETE | `/api/v2/goals/:goal_id/achievement` | 定性目標の達成を取り消す |
+| GET | `/api/v2/goal_badges` | 獲得バッジ一覧（付与日降順） |
 
-### GET /api/v1/goals/active
+期限到来分の確定は API ではなく `FinalizeGoalsJob`（Solid Queue の recurring、毎日 00:10）で行う。`POST /goals/finalize` は設けない。
 
-レスポンス:
+`period_type` / `season_id` / `metric_key` / `comparison_type` / `practice_menu_id` は作成後に変更できない（Pro 制限の回避と、指標差し替えによる目標値の無意味化を防ぐため）。
+
+### GET /api/v2/goals
+
+`V2::GoalSerializer` が返す配列。
+
 ```json
-{
-  "goals": [
-    {
-      "id": 1,
-      "title": "春季リーグで打率3割",
-      "period_type": "season",
-      "metric_key": "batting_average",
-      "metric_label": "打率",
-      "target_value": 0.300,
-      "achieved_value": 0.298,
-      "progress_percent": 99.3,
-      "deadline": "2026-06-30",
-      "days_remaining": 49,
-      "is_achieved": false
-    },
-    ...
-  ]
-}
+[
+  {
+    "id": 1,
+    "title": "春季リーグで打率3割",
+    "kind": "numeric",
+    "period_type": "season",
+    "season_id": 3,
+    "tournament_id": null,
+    "month_start": null,
+    "deadline": "2026-06-30",
+    "metric_key": "batting_average",
+    "target_value": 0.3,
+    "comparison_type": "greater_than",
+    "practice_menu_id": null,
+    "practice_menu_name": null,
+    "custom_metric_label": null,
+    "custom_unit": null,
+    "manual_current_value": 0.0,
+    "is_achieved": false,
+    "is_finalized": false,
+    "achieved_value": null,
+    "current_value": 0.298,
+    "progress_percent": 99.3,
+    "days_remaining": 49
+  }
+]
 ```
+
+指標の表示ラベルはサーバーではなくクライアント側の定数（`front/app/constants/goal.ts` 等）で解決する。
 
 ---
 
@@ -245,15 +294,17 @@ end
 ┌────────────────────────────────┐
 │  新しい目標                      │
 │                                │
-│  種類:                          │
-│   ● シーズン目標                 │
-│   ○ 月次目標                    │
+│  種類: [数値目標/達成目標/自由指標]│
+│                                │
+│  期間:                          │
+│   週次 / 月次 / 年間             │
+│   カスタム期間 / 大会 / シーズン  │
 │                                │
 │  対象シーズン: [2026年春季 ▼]    │
 │                                │
 │  指標: [打率 ▼]                  │
-│  条件: [○ 以上 / ○ 以下]         │
 │  目標値: [0.300]                 │
+│  （条件は指標ごとに固定）         │
 │                                │
 │  目標タイトル:                   │
 │  [春季リーグで打率3割]            │
@@ -288,75 +339,38 @@ end
 
 ### リアルタイム判定（プログレスバー）
 
-```ruby
-class GoalProgressCalculator
-  def initialize(goal)
-    @goal = goal
-  end
+`Goals::ProgressCalculator`（現在値・進捗率・達成判定）と `Goals::MetricCalculator`（指標の期間集計）の2クラスに分ける。
 
-  def progress_percent
-    return 0 if @goal.target_value.zero?
-
-    achieved = current_value
-    case @goal.comparison_type
-    when 'greater_than'
-      (achieved / @goal.target_value * 100).clamp(0, 100)
-    when 'less_than'
-      # 防御率等、低いほど良い指標
-      (@goal.target_value / achieved * 100).clamp(0, 100) if achieved > 0
-    end
-  end
-
-  def current_value
-    GoalMetricCalculator.calculate(@goal.user, @goal.metric_key, @goal.period_range)
-  end
-end
-```
+- `numeric`: `MetricCalculator` が `Goal#period_range` の範囲で集計した値を現在値にする
+- `qualitative`: 数値を持たず、`is_achieved` が true なら 100%、false なら 0%
+- `manual`: `manual_current_value`（手入力）を現在値にする
+- `comparison_type = less_than`（防御率等）は比率を反転する。データなし（`nil`）は 0%、真の 0.00 は目標値によらず 100%
+- `target_value = 0` は除算できないため、達成判定と同じ結果（100 / 0）に委ねる
 
 ### 期限到来時の確定処理（バッチ）
 
-```ruby
-# 毎日 00:00 に実行
-class FinalizeGoalsJob < ApplicationJob
-  def perform
-    Goal.where(is_finalized: false)
-        .where('deadline < ?', Date.current)
-        .find_each do |goal|
-      finalize_goal(goal)
-    end
-  end
+`FinalizeGoalsJob` を Solid Queue の recurring で **毎日 00:10（JST）** 実行する。
 
-  private
-
-  def finalize_goal(goal)
-    final_value = GoalProgressCalculator.new(goal).current_value
-    achieved = check_achievement(goal, final_value)
-
-    goal.update!(
-      achieved_value: final_value,
-      is_achieved: achieved,
-      achieved_at: achieved ? Time.current : nil,
-      is_finalized: true
-    )
-
-    GoalBadge.award_for(goal) if achieved
-    NotificationService.send_goal_result(goal)
-  end
-end
-```
+- 対象は `is_finalized = false` かつ `deadline < 今日（JST）`
+- 目標ごとに `with_lock` を取り、ロック後に確定済みを再チェックする（重複実行での二重確定・バッジ二重付与を防ぐ）
+- `achieved_value` / `is_achieved` / `achieved_at` / `is_finalized` を更新し、達成なら `goal_badges` を作成する
+- 定性目標の `achieved_at` はユーザーが達成ボタンを押した時刻を残し、ジョブ実行時刻で上書きしない
+- **push 通知は送らない**（アプリ起動時の達成サマリーで伝える）
 
 ---
 
 ## バッジ種類
 
+`badge_type` は `"#{period_type}_achieved"` で機械的に決まり、確定バッチが達成時に1件付与する。
+
 | バッジID | 名前 | 条件 |
 |--------|----|----|
-| `monthly_achieved` | 月間目標達成 | 月次目標1つ達成 |
-| `monthly_streak_3` | 月間目標3連続達成 | 3ヶ月連続で月次目標達成 |
-| `monthly_streak_6` | 月間目標半年連続 | 6ヶ月連続 |
-| `monthly_streak_12` | 月間目標1年連続 | 12ヶ月連続 |
-| `season_achieved` | シーズン目標達成 | シーズン目標1つ達成 |
-| `season_streak_2` | シーズン2連続 | 2シーズン連続達成 |
+| `monthly_achieved` | 月間目標達成 | 月次目標を達成して確定 |
+| `season_achieved` | シーズン目標達成 | シーズン目標を達成して確定 |
+| `tournament_achieved` | 大会目標達成 | 大会目標を達成して確定 |
+| （上記以外） | 目標達成 | 週次 / 年間 / カスタム期間の目標を達成して確定 |
+
+連続達成（`monthly_streak_3` 等）のバッジは未実装。導入するなら確定バッチ側に連続判定を足す。
 
 ---
 
@@ -364,10 +378,14 @@ end
 
 | ケース | 対応 |
 |------|----|
-| 無料ユーザーが2つ目の月次目標 | 「Pro で無制限に」訴求 |
-| 目標期限後の編集 | is_finalized = true でブロック |
-| 該当指標のデータが0件 | progress 0%、「データなし」表示 |
+| 無料ユーザーが3つ目の期間目標 | 403 + 「Pro で無制限に」訴求 |
+| 無料ユーザーがシーズン / 大会 / カスタム期間 / 自由指標の目標を作成 | 403 + Pro 限定である旨を返す |
+| 作成後の目標タイプ・期間・指標・条件の変更 | `update_params` から除外し変更不可（削除して作り直す旨を UI で案内） |
+| 該当指標のデータが0件 | progress 0%。防御率・WHIP は登板なしを内部で `nil` として未達扱い |
+| 登板なしと防御率 0.00 の区別 | `era` / `whip` は `nil`（データなし）を返し、真の 0.00 と分ける |
 | シーズン削除 | 紐付く目標は orphan 状態に（保持） |
+| 目標削除 | 獲得済みバッジは `goal_id` を nullify して残す（`goal_title` のスナップショットで表示） |
+| 数値目標で達成ボタンを押す | 422（自動判定のため手動達成不可） |
 
 ---
 
@@ -375,9 +393,9 @@ end
 
 ### 単体テスト
 
-- [ ] GoalProgressCalculator の各指標
-- [ ] FinalizeGoalsJob の達成判定
-- [ ] GoalBadge の付与ロジック
+- [ ] `Goals::MetricCalculator` の各指標
+- [ ] `Goals::ProgressCalculator` の進捗率・達成判定（`less_than` / データなし / `target_value = 0`）
+- [ ] `FinalizeGoalsJob` の達成判定・重複実行時の二重付与防止
 
 ### 統合テスト
 
@@ -388,12 +406,14 @@ end
 
 ## 完了の定義（Definition of Done）
 
-- [ ] シーズン・月次の目標設定が動作
-- [ ] プログレスバーがリアルタイム更新
-- [ ] 期限到来時の自動確定処理が動作
-- [ ] バッジ獲得が動作
-- [ ] Pro / 無料 の制限が正しく機能
-- [ ] 達成時にプッシュ通知
+- [x] シーズン・大会・週次・月次・年間・カスタム期間の目標設定が動作
+- [x] 数値 / 定性 / 自由指標の3種類が動作
+- [x] プログレスバーがリアルタイム更新
+- [x] 期限到来時の自動確定処理が動作（`FinalizeGoalsJob`）
+- [x] バッジ獲得が動作
+- [x] Pro / 無料 の制限が正しく機能
+- [x] 月末・シーズン終了後の達成サマリーをアプリ内で表示（月1回まで）
+- 達成時のプッシュ通知は MVP 不採用
 
 ---
 

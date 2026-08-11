@@ -34,10 +34,10 @@
 
 ### 価格
 
-- 月額: ¥300
-- 年額: ¥2,980（月換算 ¥248、17% off）
-- 早期特典: リリース後7日以内加入で30日無料
-- 通常トライアル: 7日無料
+- 月額: ¥480
+- 年額: ¥4,800（月換算 ¥400、2ヶ月分お得）
+- 通常トライアル: 7日無料（`TrialDaysCalculator::NORMAL_TRIAL_DAYS`。再加入=`has_used_trial`は0日）
+- 早期加入者: リリース後7日以内（`2026-05-31`〜`2026-06-06`、ENVで期間override可）の加入者に `is_early_subscriber` フラグを記録するのみ。当初検討していた「30日無料」は実装していない（トライアルは一律7日）
 
 ---
 
@@ -57,7 +57,7 @@
 | 08 | 08-pro-feature-schedule.md | 自主練スケジュール要件 | 🟢 ドラフト |
 | 09 | 09-pro-feature-baseball-note-ext.md | 野球ノート拡張要件 | 🟢 ドラフト |
 | 10 | 10-mobile-admob.md | mobile AdMob 要件 | 🟢 ドラフト |
-| 11 | 11-release-checklist.md | リリースチェックリスト | ⚪ リリース直前に作成 |
+| 11 | [11-release-checklist.md](./pro-plan-prd/11-release-checklist.md) | リリースチェックリスト | 🟢 ドラフト |
 | 12 | [12-pro-feature-improvement-loop.md](./pro-plan-prd/12-pro-feature-improvement-loop.md) | 上達ループ拡張（課題テーマ / 相関インサイト / 振り返りテンプレ / 週次レポート） | 🟢 ドラフト |
 
 > PRD-12 は MVP 後の拡張。練習記録（PRD-05）・野球ノート（PRD-09）を「課題→練習→検証→次へ」の上達ループに束ねる4機能を一括管理する。
@@ -68,7 +68,8 @@
 |---|---------|------|------|
 | 01 | [01-system-architecture.md](./pro-plan-design/01-system-architecture.md) | システムアーキテクチャ設計 | 🟢 作成済み |
 | 02 | [02-payment-flow.md](./pro-plan-design/02-payment-flow.md) | 課金フロー設計 | 🟢 作成済み |
-| 03〜 | （各 Pro 機能の Design Doc） | - | ⚪ 実装直前に作成 |
+| 03 | [03-ux-information-architecture.md](./pro-plan-design/03-ux-information-architecture.md) | Pro 機能の UX / 情報設計 | 🟢 作成済み |
+| 04〜 | （各 Pro 機能の Design Doc） | - | ⚪ 実装直前に作成 |
 
 ---
 
@@ -92,6 +93,8 @@
 ---
 
 ## 開発スケジュール
+
+> 以下は 2026-05-12 時点の計画。実際にはリリースが後ろ倒しになり、実装は `release/pro-202605` ブランチ上で継続中（未リリース）。
 
 ```
 今日 (5/12)
