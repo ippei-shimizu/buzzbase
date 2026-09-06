@@ -38,7 +38,7 @@ jobs:
 
           # publicリポジトリのため、外部コントリビューターのコメントに仕込まれた
           # 指示をClaudeが読み込まないよう、処理対象のコメント投稿者を限定する
-          include_comments_by_actor: 'ippei-shimizu'
+          include_comments_by_actor: "ippei-shimizu"
 
           # This is an optional setting that allows Claude to read CI results on PRs
           additional_permissions: |
