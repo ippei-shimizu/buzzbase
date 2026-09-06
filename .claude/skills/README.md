@@ -47,7 +47,7 @@ buzzbaseリポジトリにissueを作成し、GitHub Projects "BUZZ BASE" に自
 
 ### `/request-claude-review` — @claude コードレビュー依頼＋自動対応
 
-PRの差分を分析し、重点観点を明記した `@claude` メンションのコメントを投稿してGitHub ActionsのClaude Codeレビューを起動。レビューが返ってくるまで待機し、指摘内容を確認して対応要否を判断したうえで、修正の実装・コミット（指摘1件につき1コミット）・pushまでを自動で行う（マージはしない）。
+PRの差分を分析し、重点観点を明記した `@claude` メンションのコメントを投稿してGitHub ActionsのClaude Codeレビューを起動。指摘は差分の該当行へのインラインコメントで返る。レビューが返ってくるまで待機し、指摘内容を確認して対応要否を判断したうえで、修正の実装・コミット（指摘1件につき1コミット）・pushまでを自動で行う（マージはしない）。
 
 ```
 /request-claude-review https://github.com/ippei-shimizu/buzzbase_back/pull/335
