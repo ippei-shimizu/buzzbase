@@ -21,14 +21,16 @@ PR の URL または番号を受け取り、差分を分析したうえで**重�
 ## 絶対ルール
 
 - **PR をマージしない**。`gh pr merge` を絶対に実行しない。マージは常にユーザーが行う
-- **PR の本文・タイトル・ラベル・状態を変更しない**。このスキルが行うのはコメント投稿と、対象ブランチへのコミット・pushのみ
+- **PR の本文・タイトル・ラベル・状態を変更しない**。このスキルが行うのは、コメント投稿・指摘スレッドへの返信と resolve・対象ブランチへのコミット・push のみ
 - **コメント本文は必ず `--body-file` で渡す**。`--body "$(cat <<EOF ...)"` はバッククォートやドル記号が展開されて本文が崩れる
 - **絵文字を使わない**（Issue / PR / コミット等の永続化される文章の共通ルール）
 - 本文に `@claude` の文字列を必ず含める。これが無いとワークフローが起動しない
 - 本文に**インラインコメントで指摘するよう明示的に指示する**（詳細は「4. コメント本文の作成」）。指示が無いと1件のまとめコメントで返ってくる
 - ユーザーへの確認・承認を求めない。引数を解析したら分析して即座に投稿し、レビューが返ってきたら対応要否の判断・修正・push まで確認なしで進める（マージだけはしない）
 - レビュー指摘に対応する際は、モノレポのルールどおり**指摘1件につき1コミット**に分割する。push は最後にまとめて1回でよい
-- **対応完了・push まで終えたら、ワークフローの最終ステップとして必ず `record-learning` スキルを実行する**（詳細は「13. 学習ループの実行」）。省略しない
+- **すべての指摘に、そのスレッドへの返信を必ず投稿する**（対応した／対応しない のどちらも）。返信せずに最終報告だけで済ませない（詳細は「12. 指摘スレッドへの返信と resolve」）
+- **決着した指摘スレッドは resolve する**。ただしマージ直前など PR 外に持ち越すアクションが残るものは未解決のまま残す（同上）
+- **対応完了・push まで終えたら、ワークフローの最終ステップとして必ず `record-learning` スキルを実行する**（詳細は「14. 学習ループの実行」）。省略しない
 
 ## 前提
 
@@ -91,7 +93,7 @@ PR が `MERGED` または `CLOSED` の場合は、その旨を報告して投稿
 
 差分が大きい場合（`changedFiles` が 30 を超える、または `gh pr diff` の出力が長大な場合）は、まずファイル一覧とコミット履歴で全体像を把握し、変更の中心となるファイルに絞って差分を読む。
 
-対応フェーズ（後述 8〜10）でローカルに修正をコミットする必要があるため、この時点で `headRefName` を控えておき、ローカルの作業ツリーが対象ブランチと一致しているか（`git branch --show-current` / `git status`）を確認しておく。一致していなければ対象ブランチを checkout する（未コミットの変更がある場合は先に確認する。詳細は環境の安全ルールに従う）。
+対応フェーズ（後述 8〜12）でローカルに修正をコミットする必要があるため、この時点で `headRefName` を控えておき、ローカルの作業ツリーが対象ブランチと一致しているか（`git branch --show-current` / `git status`）を確認しておく。一致していなければ対象ブランチを checkout する（未コミットの変更がある場合は先に確認する。詳細は環境の安全ルールに従う）。
 
 ### 3. 重点観点の抽出
 
@@ -217,7 +219,29 @@ gh api repos/"$REPO"/issues/"$PR_NUMBER"/comments --jq \
   '[.[] | select(.created_at > $since)] | .[] | {user: .user.login, body}'
 ```
 
+後段の返信・resolve に必要な `threadId` は REST では取れないため、GraphQL でまとめて引く。`comments.nodes[0].databaseId` が上の REST で取得したインラインコメントの `id` と対応する。
+
+```bash
+gh api graphql -f query='
+query($owner:String!, $repo:String!, $pr:Int!) {
+  repository(owner:$owner, name:$repo) {
+    pullRequest(number:$pr) {
+      reviewThreads(first:50) {
+        nodes {
+          id
+          isResolved
+          isOutdated
+          comments(first:1) { nodes { databaseId path line } }
+        }
+      }
+    }
+  }
+}' -f owner=<owner> -f repo=<repo> -F pr="$PR_NUMBER" --jq \
+ '.data.repository.pullRequest.reviewThreads.nodes[] | {threadId: .id, resolved: .isResolved, commentId: .comments.nodes[0].databaseId, path: .comments.nodes[0].path, line: .comments.nodes[0].line}'
+```
+
 - 各インラインコメントは `path` と `line` で一意に扱う。以降のステップではこの `path:line` を指摘の識別子として使う
+- **`commentId`（返信先）と `threadId`（resolve 先）を指摘ごとに控えておく**。両者は別物で、返信は REST の `commentId`、resolve は GraphQL の `threadId` を使う
 - `line` が `null` のコメントは、対象行が push で変わって outdated になったもの。`diff_hunk` と `original_line` から対象を特定する
 - **インラインコメントが0件で通常コメントだけが返ってきた場合**は、通常コメントの内容でそのまま対応を進めつつ、原因を切り分けて最終報告に明記する。run のログ（`gh run view <RUN_ID> --repo "$REPO" --log`）の `SDK options` に出る `allowedTools` に `mcp__github_inline_comment__create_inline_comment` が含まれているかを見れば、ワークフロー設定の不足かどうかが判別できる
 - 新規コメント・レビューが1件も見つからない場合は、ワークフローの run ログを確認し、投稿に失敗している可能性をユーザーに報告して終了する
@@ -229,6 +253,9 @@ gh api repos/"$REPO"/issues/"$PR_NUMBER"/comments --jq \
 - **対応する**: コードの欠陥・矛盾・規約違反など、具体的で妥当な指摘
 - **対応しない（既知・意図的）**: 既存の設計判断・別issueで追跡中・PRのスコープ外など、理由とともに見送る
 - **対応しない（誤検知）**: 差分を正しく読めていない、事実誤認、提案の前提が誤っているなど
+- **対応不要（確認事項）**: 「この理解で正しいか」の確認や、問題なしと結論づけた報告。コード変更は生じない
+
+分類と同時に、その指摘を **resolve するかどうか** も決める（判断基準は「12. 指摘スレッドへの返信と resolve」）。
 
 判断に迷う指摘は、`path:line` の実コードを読んで裏を取ってから判断する（レビューコメントの記述を鵜呑みにしない）。インラインコメントは行が特定されている分、誤検知かどうかの確認も容易になる。全指摘を対応する必要はない。「対応しない」も正当な判断であり、その場合は理由を明確にしておく（最終報告で使う）。
 
@@ -248,16 +275,78 @@ gh api repos/"$REPO"/issues/"$PR_NUMBER"/comments --jq \
 git push
 ```
 
-### 12. 結果報告
+### 12. 指摘スレッドへの返信と resolve
+
+push が完了したあと、**すべての指摘スレッドに返信する**。対応した指摘だけでなく、対応しなかった指摘にも必ず返信する。GitHub 上でスレッドを見た人が、最終報告を読まなくても結論と理由を追えるようにするため。
+
+#### 返信
+
+返信は REST の replies エンドポイントに、`commentId`（そのスレッドの先頭コメントの `id`）を指定して投稿する。**本文は必ずファイルから渡す**（`-F body=@<path>`）。インラインで書くとバッククォートやドル記号が展開されて崩れる。
+
+```bash
+gh api repos/"$REPO"/pulls/"$PR_NUMBER"/comments/<commentId>/replies \
+  -F body=@<返信本文のファイルパス> --jq '.html_url'
+```
+
+返信本文に含める内容:
+
+| 分類 | 書くこと |
+| ---- | ---- |
+| 対応した | 「対応しました（コミットハッシュ）」＋ 何をどう直したかを1〜2文 |
+| 対応しない（既知・意図的） | 「対応しません」＋ 見送る理由。別issue化するならその旨 |
+| 対応しない（誤検知） | 「対応しません」＋ **何が事実と異なるか**を根拠付きで。指摘を否定するだけで終えない |
+| 対応不要（確認事項） | 認識が一致したこと、変更していないことを明示する |
+
+- 指摘者に敬意を持った書き方にする。誤検知でも「ご確認ありがとうございます」等を添え、断定は根拠とセットにする
+- 絵文字は使わない
+
+#### resolve
+
+決着したスレッドのみ resolve する。resolve は REST では行えないため GraphQL の `resolveReviewThread` を使い、`threadId`（ステップ8で控えたもの）を渡す。
+
+```bash
+gh api graphql -f query='
+mutation($threadId:ID!) {
+  resolveReviewThread(input:{threadId:$threadId}) { thread { isResolved } }
+}' -f threadId=<threadId> --jq '.data.resolveReviewThread.thread.isResolved'
+```
+
+resolve するかどうかの判断:
+
+| 状態 | resolve |
+| ---- | ---- |
+| 対応した（このPR内で完結） | する |
+| 対応しない（誤検知） | する |
+| 対応不要（確認事項） | する |
+| 対応しない（既知・意図的）でこのPR内で議論が完結 | する |
+| **マージ直前に実施する必要がある**（rebase・schema再生成・本番データ確認など） | **しない** |
+| **別issue化するなど、PR外にアクションが残る** | **しない** |
+| ユーザーの判断を仰ぎたい・意見が割れている | **しない** |
+
+- **返信より先に resolve しない**。必ず返信を投稿してから resolve する（理由が残らないまま畳まれるのを防ぐ）
+- 未解決のまま残すスレッドには、返信本文に「このスレッドは〜のため未解決のまま残します」と理由を明記する
+- 全スレッドの最終状態を確認してから次に進む
+
+```bash
+gh api graphql -f query='
+query($owner:String!, $repo:String!, $pr:Int!) {
+  repository(owner:$owner, name:$repo) { pullRequest(number:$pr) {
+    reviewThreads(first:50) { nodes { isResolved comments(first:1){nodes{path line}} } } } } }' \
+  -f owner=<owner> -f repo=<repo> -F pr="$PR_NUMBER" --jq \
+  '.data.repository.pullRequest.reviewThreads.nodes[] | "\(.comments.nodes[0].path):\(.comments.nodes[0].line) resolved=\(.isResolved)"'
+```
+
+### 13. 結果報告
 
 以下を簡潔に報告する。
 
 - 投稿した依頼コメントの URL
 - 起動したワークフローの run ID と最終 status
-- 指摘の一覧を `path:line` 付きの表で示し、それぞれの対応要否・理由を併記する
+- 指摘の一覧を `path:line` 付きの表で示し、それぞれの対応要否・理由・**resolve したか**を併記する
 - 対応した指摘のコミット一覧、push 済みであること
+- resolve せずに残したスレッドがあれば、その理由（マージ直前の作業として引き継ぐ内容など）を明示する
 
-### 13. 学習ループの実行
+### 14. 学習ループの実行
 
 このスキルの最終ステップとして**必ず**実行する。省略・後回しにしない。
 
@@ -268,5 +357,6 @@ git push
 - `gh pr comment` は PR を変更しないが、**外部に公開されるコメントの投稿**である。引数で対象 PR が明示されている場合はそのまま実行してよい
 - 同じ PR に対して繰り返し依頼する場合、前回のレビュー結果を踏まえて観点を更新する。同一内容の再投稿は避ける
 - 修正後に自動でもう一度 `@claude` レビューを依頼することはしない（無限ループになりうるため）。再レビューが必要な場合はユーザーが改めて依頼する
-- 「対応しない」と判断した指摘を黙って握りつぶさない。最終報告に必ず理由付きで含める
-- インラインコメントへの返信・解決（resolve）はこのスキルでは行わない。対応内容は最終報告とコミットで示す
+- 「対応しない」と判断した指摘を黙って握りつぶさない。**該当スレッドへの返信**と最終報告の両方に、必ず理由付きで含める
+- resolve は「議論が決着したことの記録」であって「対応したことの記録」ではない。対応しなかった指摘でも、結論が出て返信済みなら resolve してよい。逆に、対応済みでもマージ直前の追加作業が紐づくものは未解決のまま残す
+- 一度 resolve したスレッドを、同じセッション内で resolve し直したり unresolve したりしない
