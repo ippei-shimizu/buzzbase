@@ -54,6 +54,41 @@ APIのベースパス: `/api/v1/`
 - **TODO コメントは何を対応するのかを必ず明記して残す**（例: `# TODO: 各 event_type に応じた handler を実装する`）。**issue / PR 番号は書かない**（`# TODO(#346):` のような書き方は禁止）
 - **コメントは端的に書く**。WHY と前提を1〜2文で示せば十分で、内部実装の詳細を複数段にわたって解説する長大コメントは避ける。yardoc / TSDoc も「責務」「引数・返り値の意味」を簡潔に書く
 
+## Issue 着手ルール
+
+issue の対応を始めるときは、**実装に手を付ける前に** GitHub Projects "BUZZ BASE"（`ippei-shimizu/projects/2`）の Status を `In Progress` に変更する。確認は不要で即実行する。
+
+- 発火条件: 「issue #XXX に着手して」「#XXX やって」など、特定 issue の実装を開始するとき（`/checkout-branch` 経由でも手動着手でも同じ）
+- 変更後に実装・ブランチ作成へ進む。Status 変更が失敗した場合は報告だけして実装は続行する
+- 完了時の `Check` / `Done` への変更は従来どおりユーザーが行う
+
+```bash
+# 1. issue の node ID とプロジェクトアイテム ID を取得
+gh api graphql -f query='
+  query($number: Int!) {
+    user(login: "ippei-shimizu") {
+      projectV2(number: 2) {
+        items(first: 100, orderBy: {field: POSITION, direction: DESC}) {
+          nodes { id content { ... on Issue { number } } }
+        }
+      }
+    }
+  }
+' -F number=<ISSUE_NUMBER> --jq '.data.user.projectV2.items.nodes[] | select(.content.number == <ISSUE_NUMBER>) | .id'
+
+# 2. Status を In Progress に更新（ID は固定値。変更されていたら Status フィールドを取得し直す）
+gh api graphql -f query='
+  mutation {
+    updateProjectV2ItemFieldValue(input: {
+      projectId: "PVT_kwHOBn5Bw84AYbis"
+      itemId: "<ITEM_ID>"
+      fieldId: "PVTSSF_lAHOBn5Bw84AYbiszgPnoDw"
+      value: { singleSelectOptionId: "47fc9ee4" }
+    }) { projectV2Item { id } }
+  }
+'
+```
+
 ## Gitルール
 
 - コミットメッセージは **日本語** で記述
