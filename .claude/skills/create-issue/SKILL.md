@@ -25,6 +25,9 @@ allowedTools:
 - issueは常に `ippei-shimizu/buzzbase` に作成する（front/backサブモジュールには作らない）
 - プロジェクト "BUZZ BASE" に自動追加する
 - ラベルは既存のものから選択する: `bug`, `enhancement`, `documentation`, `duplicate`, `good first issue`, `help wanted`, `invalid`, `question`, `wontfix`
+- **対応対象のリポジトリを示すラベルを必ず付ける**: `frontend`（front / Next.js）、`backend`（back / Rails API）、`mobile`（mobile / React Native）
+  - 複数のサブモジュールにまたがる場合は該当するものをすべて付ける
+  - ルートリポジトリのみで完結する作業（CI / docs / モノレポ設定など）の場合は付けない
 - Assigneeは常に `ippei-shimizu` を設定する
 - すべて日本語で記述する
 - **確認なしで即座にissueを作成する**
@@ -51,6 +54,11 @@ allowedTools:
   - バグ報告 → `bug`
   - 新機能・改善・パフォーマンス → `enhancement`
   - ドキュメント → `documentation`
+- **リポジトリラベル（必須）**: どこを触る作業かが一覧で判別できるよう、種類ラベルとは別に必ず付ける
+  - front を触る → `frontend`
+  - back を触る → `backend`
+  - mobile を触る → `mobile`
+  - 判断材料は「対応内容で編集するファイルがどのサブモジュールにあるか」。front / mobile 共通の画面や計測は両方付ける
 - **本文**: 引数で渡された情報を漏らさず構造化して記述する。背景、対象範囲、仕様、スコープ外、関連 PR / Issue / 参考リンクなど、引数に含まれる詳細はすべて Markdown 見出しと箇条書きで整理して載せる。引数が概要しかない場合のみ、その概要を 1〜2 文で記述する。
 
 ### 3. issue作成
@@ -62,7 +70,7 @@ gh issue create \
   --repo ippei-shimizu/buzzbase \
   --title "<タイトル>" \
   --body "<本文>" \
-  --label "<ラベル1>,<ラベル2>" \
+  --label "<種類ラベル>,<リポジトリラベル>" \
   --assignee ippei-shimizu \
   --project "BUZZ BASE"
 ```
