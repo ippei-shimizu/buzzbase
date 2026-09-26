@@ -126,6 +126,11 @@ gh api graphql -f query='
 - `gh pr create --base <table-value> ...` をリポジトリ別に切り替える
 - ユーザーが「main に向けて」「develop に向けて」等と明示した場合はそれに従う
 
+### PR の assignee は必ず `ippei-shimizu` にする
+
+- スキル経由か手動かを問わず、全リポジトリで PR 作成時に `ippei-shimizu` を assignee に設定する
+- `gh` の場合は `gh pr create --assignee ippei-shimizu`。GitHub MCP の `create_pull_request` は assignee を指定できないため、作成直後に `issue_write`（`method: update`, `assignees: ["ippei-shimizu"]`）で設定する
+
 ### PR レビュー指摘対応のコミットは指摘ごとに分割する
 
 - 「Fix: PR レビュー指摘に対応 (A / B / C)」のように複数の独立した指摘を1コミットにまとめるのは **禁止**
