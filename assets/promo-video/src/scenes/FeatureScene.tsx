@@ -34,9 +34,9 @@ export const FeatureScene: React.FC<Props> = ({
   const enter = spring({
     frame,
     fps,
-    config: { damping: 200, mass: 1, stiffness: 108 },
+    config: { damping: 200, mass: 0.9, stiffness: 136 },
   });
-  const exit = track(frame, duration - 18, 18, { easing: EASE_IN_OUT });
+  const exit = track(frame, duration - 17, 17, { easing: EASE_IN_OUT });
   const drift = wave(frame, 220, 1.8);
 
   const phoneZ = interpolate(enter, [0, 1], [-900, 0]) + exit * 360;
@@ -44,7 +44,7 @@ export const FeatureScene: React.FC<Props> = ({
   const phonePitch = interpolate(enter, [0, 1], [12, 2.4]) - exit * 7;
   const phoneY = interpolate(enter, [0, 1], [150, 0]) + exit * -80;
 
-  const captionOut = 1 - track(frame, duration - 28, 18, { easing: EASE_IN_OUT });
+  const captionOut = 1 - track(frame, duration - 26, 16, { easing: EASE_IN_OUT });
   const chipShift = chips ? 56 : 0;
 
   return (
@@ -96,7 +96,7 @@ export const FeatureScene: React.FC<Props> = ({
                 <StatChip
                   label={chip.label}
                   value={chip.value}
-                  progress={track(frame, 30 + index * 8, 20) * (1 - exit)}
+                  progress={track(frame, 18 + index * 6, 16) * (1 - exit)}
                   scale={1.06 - index * 0.08}
                 />
               </div>
@@ -118,9 +118,9 @@ export const FeatureScene: React.FC<Props> = ({
             transform: `translateY(${(1 - captionOut) * -38}px)`,
           }}
         >
-          <Eyebrow label={eyebrow} progress={track(frame, 2, 16)} />
-          <Headline lines={lines} frame={frame} start={7} />
-          <SubCopy text={sub} progress={track(frame, 22, 18)} />
+          <Eyebrow label={eyebrow} progress={track(frame, 1, 12)} />
+          <Headline lines={lines} frame={frame} start={4} />
+          <SubCopy text={sub} progress={track(frame, 16, 14)} />
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

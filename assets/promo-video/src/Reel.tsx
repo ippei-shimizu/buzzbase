@@ -26,24 +26,24 @@ type Feature = Beat & {
  * 次のシーンをこのフレーム数だけ前倒しで始める。
  * 前のシーンの抜きと重ならないと、切り替わりで一瞬なにも映らないフレームができる。
  */
-const OVERLAP = 14;
+const OVERLAP = 10;
 
-const HOOK: Beat = { from: 0, duration: 45 };
-const THESIS: Beat = { from: 45, duration: 95 };
-const LOGO: Beat = { from: 140, duration: 75 };
-const DUO: Beat = { from: 995, duration: 114 };
-const CTA: Beat = { from: 1109, duration: 150 };
+const HOOK: Beat = { from: 0, duration: 60 };
+const THESIS: Beat = { from: 60, duration: 100 };
+const LOGO: Beat = { from: 160, duration: 80 };
+const DUO: Beat = { from: 800, duration: 80 };
+const CTA: Beat = { from: 880, duration: 160 };
 
 export const TOTAL_FRAMES = CTA.from + CTA.duration;
 
 const FEATURES: Feature[] = [
   {
-    from: 215,
-    duration: 120,
+    from: 240,
+    duration: 80,
     screen: "dashboard",
     eyebrow: "AUTO CALC",
     lines: ["打率も OPS も", "防御率も、自動で。"],
-    sub: "試合結果を入れるだけ。46項目を自動計算。",
+    sub: "46項目を自動計算。",
     tilt: -9,
     chips: [
       { label: "打率", value: ".287" },
@@ -51,57 +51,57 @@ const FEATURES: Feature[] = [
     ],
   },
   {
-    from: 335,
-    duration: 108,
+    from: 320,
+    duration: 80,
     screen: "plate-input",
     eyebrow: "RECORD",
     lines: ["打球方向も結果も", "タップで選ぶだけ"],
-    sub: "左中間も右翼線も、13方向に分けて残せる。",
+    sub: "13方向に分けて残せる。",
     tilt: 9,
   },
   {
-    from: 443,
-    duration: 108,
+    from: 400,
+    duration: 80,
     screen: "plate-detail",
     eyebrow: "DETAIL",
     lines: ["1打席を、", "ここまで残せる"],
-    sub: "カウント・ランナー・イニングまで1打席ずつ。",
+    sub: "カウントもランナーも。",
     tilt: -9,
   },
   {
-    from: 551,
-    duration: 114,
+    from: 480,
+    duration: 80,
     screen: "course",
     eyebrow: "PRO ANALYSIS",
     lines: ["コースごとの", "打率までわかる"],
-    sub: "ボール球も含めた25コースを自動集計。",
+    sub: "25コースを自動集計。",
     tilt: 9,
   },
   {
-    from: 665,
-    duration: 108,
+    from: 560,
+    duration: 80,
     screen: "direction",
     eyebrow: "SPRAY CHART",
     lines: ["打った方向ごとの", "打率が見える"],
-    sub: "引っ張りと逆方向、どちらで結果が出ているか。",
+    sub: "引っ張りも逆方向も。",
     tilt: -9,
   },
   {
-    from: 773,
-    duration: 108,
+    from: 640,
+    duration: 80,
     screen: "pitcher",
     eyebrow: "MATCHUP",
     lines: ["同じ投手との", "通算成績が残る"],
-    sub: "次に対戦する前に、どう攻められたか思い出せる。",
+    sub: "次の対戦の前に見返せる。",
     tilt: 9,
   },
   {
-    from: 881,
-    duration: 114,
+    from: 720,
+    duration: 80,
     screen: "ranking",
     eyebrow: "RANKING",
     lines: ["チームの仲間と", "成績で競える"],
-    sub: "グループを作れば、部内の順位がひと目でわかる。",
+    sub: "部内の順位がひと目で。",
     tilt: -9,
   },
 ];

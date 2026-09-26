@@ -9,18 +9,18 @@ export const DuoScene: React.FC<{ duration: number }> = ({ duration }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const exit = track(frame, duration - 24, 24, { easing: EASE_IN_OUT });
-  const captionOut = 1 - track(frame, duration - 36, 22, { easing: EASE_IN_OUT });
+  const exit = track(frame, duration - 18, 18, { easing: EASE_IN_OUT });
+  const captionOut = 1 - track(frame, duration - 26, 16, { easing: EASE_IN_OUT });
 
   const phone = (delay: number) =>
     spring({
       frame: frame - delay,
       fps,
-      config: { damping: 200, mass: 1, stiffness: 106 },
+      config: { damping: 200, mass: 0.9, stiffness: 134 },
     });
 
   const back = phone(0);
-  const front = phone(7);
+  const front = phone(6);
 
   return (
     <AbsoluteFill style={{ perspective: 1900, perspectiveOrigin: "50% 48%" }}>
@@ -37,9 +37,9 @@ export const DuoScene: React.FC<{ duration: number }> = ({ duration }) => {
             transform: `translateY(${(1 - captionOut) * -34}px)`,
           }}
         >
-          <Eyebrow label="ROUTINE" progress={track(frame, 4, 22)} />
-          <Headline lines={["練習も野球ノートも", "ぜんぶここに"]} frame={frame} start={12} />
-          <SubCopy text="その日の練習と気づきが、成績とつながる。" progress={track(frame, 30, 24)} />
+          <Eyebrow label="ROUTINE" progress={track(frame, 1, 12)} />
+          <Headline lines={["練習も野球ノートも", "ぜんぶここに"]} frame={frame} start={4} />
+          <SubCopy text="練習も気づきも、成績とつながる。" progress={track(frame, 16, 14)} />
         </div>
 
         <div
