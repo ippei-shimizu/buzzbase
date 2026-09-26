@@ -26,6 +26,7 @@ issue内容の検証 → Status を In Progress → 作業ブランチ作成 →
 
 - **PR をマージしない**。`gh pr merge` を絶対に実行しない。マージは常にユーザーが行う
 - **PR は必ず Draft で作成する**（`gh pr create --draft`）。Ready for review への変更もユーザーが行う
+- **PR の assignee には必ず `ippei-shimizu` を指定する**（`gh pr create --assignee ippei-shimizu`）。省略しない
 - **issue の内容に疑義がある場合は実装に入らず、その issue をスキップしてユーザーに確認する**（判定基準は「2. issue 内容の検証」）。疑義のない他の issue は先に最後まで進める
 - **ユーザーの未コミット変更が残っている作業ツリーでは `git stash` / `git checkout` しない**。対象サブモジュールに未コミット変更があれば、その issue は着手せずユーザーに報告する
 - issue は**逐次処理**する。front / back / mobile の作業ツリーは1つしかないため、同一サブモジュールを対象とする複数 issue を並行して進めると互いの変更が混ざる
