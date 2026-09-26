@@ -59,6 +59,19 @@ issue の内容が妥当か（実装済みでないか、既存コードと矛�
 
 ---
 
+### `/implement-issue-cloud` — issue 実装 → Draft PR → レビュー依頼（クラウドセッション版）
+
+`/implement-issue` を Claude Code on the web（クラウドセッション）で動くように置き換えたもの。`gh` CLI の代わりに GitHub MCP を使い、リポジトリの場所は remote URL から検出し、push 先はセッションが指定したブランチに固定する。レビューは `gh run watch` で待たず、PR を購読してイベントで起こされてから指摘対応する。Projects の Status 変更は MCP でできないため、最終報告でユーザーに依頼する。1ブランチ = 1 PR のため、同じリポジトリを対象とする issue は1セッション1件まで。
+
+```
+/implement-issue-cloud 340
+/implement-issue-cloud 340 341
+```
+
+トリガー: クラウドセッションでの「issue #340 を実装してPRまで出して」
+
+---
+
 ### `/request-claude-review` — @claude コードレビュー依頼＋自動対応
 
 PRの差分を分析し、重点観点を明記した `@claude` メンションのコメントを投稿してGitHub ActionsのClaude Codeレビューを起動。指摘は差分の該当行へのインラインコメントで返る。レビューが返ってくるまで待機し、指摘内容を確認して対応要否を判断したうえで、修正の実装・コミット（指摘1件につき1コミット）・pushまでを自動で行う（マージはしない）。
