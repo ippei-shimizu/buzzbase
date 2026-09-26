@@ -20,11 +20,11 @@ export const LogoScene: React.FC<{ duration: number }> = ({ duration }) => {
   const land = spring({
     frame,
     fps,
-    config: { damping: 190, mass: 1.1, stiffness: 84 },
+    config: { damping: 190, mass: 0.95, stiffness: 120 },
   });
   const exit = track(frame, duration - 20, 20, { easing: EASE_IN_OUT });
 
-  const sheen = track(frame, 24, 34, { easing: EASE_IN_OUT, from: -130, to: 130 });
+  const sheen = track(frame, 16, 26, { easing: EASE_IN_OUT, from: -130, to: 130 });
 
   return (
     <AbsoluteFill style={{ perspective: 1700, perspectiveOrigin: "50% 48%" }}>
@@ -107,8 +107,8 @@ export const LogoScene: React.FC<{ duration: number }> = ({ duration }) => {
               letterSpacing: "0.36em",
               color: COLOR.chalk,
               whiteSpace: "nowrap",
-              opacity: track(frame, 26, 26),
-              transform: `translateY(${(1 - track(frame, 26, 26)) * 22}px)`,
+              opacity: track(frame, 18, 20),
+              transform: `translateY(${(1 - track(frame, 18, 20)) * 22}px)`,
             }}
           >
             野球の個人成績記録アプリ

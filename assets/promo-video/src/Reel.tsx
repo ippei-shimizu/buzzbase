@@ -1,9 +1,11 @@
 import React from "react";
-import { AbsoluteFill, Sequence, useCurrentFrame } from "remotion";
-import { Backdrop, Watermark } from "./components/Backdrop";
-import { Streaks } from "./components/Streaks";
+import { AbsoluteFill, Audio, Sequence, staticFile, useCurrentFrame } from "remotion";
+import { Backdrop } from "./components/Backdrop";
+import { Hud } from "./components/Hud";
+import { Transitions } from "./components/Transitions";
 import { FeatureScene, type Chip } from "./scenes/FeatureScene";
-import { Teaser } from "./scenes/Teaser";
+import { Hook } from "./scenes/Hook";
+import { Thesis } from "./scenes/Thesis";
 import { LogoScene } from "./scenes/LogoScene";
 import { DuoScene } from "./scenes/DuoScene";
 import { Cta } from "./scenes/Cta";
@@ -24,19 +26,20 @@ type Feature = Beat & {
  * 次のシーンをこのフレーム数だけ前倒しで始める。
  * 前のシーンの抜きと重ならないと、切り替わりで一瞬なにも映らないフレームができる。
  */
-const OVERLAP = 20;
+const OVERLAP = 14;
 
-const TEASER: Beat = { from: 0, duration: 135 };
-const LOGO: Beat = { from: 135, duration: 105 };
-const DUO: Beat = { from: 1176, duration: 138 };
-const CTA: Beat = { from: 1314, duration: 156 };
+const HOOK: Beat = { from: 0, duration: 45 };
+const THESIS: Beat = { from: 45, duration: 95 };
+const LOGO: Beat = { from: 140, duration: 75 };
+const DUO: Beat = { from: 995, duration: 114 };
+const CTA: Beat = { from: 1109, duration: 150 };
 
 export const TOTAL_FRAMES = CTA.from + CTA.duration;
 
 const FEATURES: Feature[] = [
   {
-    from: 240,
-    duration: 150,
+    from: 215,
+    duration: 120,
     screen: "dashboard",
     eyebrow: "AUTO CALC",
     lines: ["打率も OPS も", "防御率も、自動で。"],
@@ -48,8 +51,8 @@ const FEATURES: Feature[] = [
     ],
   },
   {
-    from: 390,
-    duration: 126,
+    from: 335,
+    duration: 108,
     screen: "plate-input",
     eyebrow: "RECORD",
     lines: ["打球方向も結果も", "タップで選ぶだけ"],
@@ -57,8 +60,8 @@ const FEATURES: Feature[] = [
     tilt: 9,
   },
   {
-    from: 516,
-    duration: 126,
+    from: 443,
+    duration: 108,
     screen: "plate-detail",
     eyebrow: "DETAIL",
     lines: ["1打席を、", "ここまで残せる"],
@@ -66,8 +69,8 @@ const FEATURES: Feature[] = [
     tilt: -9,
   },
   {
-    from: 642,
-    duration: 138,
+    from: 551,
+    duration: 114,
     screen: "course",
     eyebrow: "PRO ANALYSIS",
     lines: ["コースごとの", "打率までわかる"],
@@ -75,8 +78,8 @@ const FEATURES: Feature[] = [
     tilt: 9,
   },
   {
-    from: 780,
-    duration: 126,
+    from: 665,
+    duration: 108,
     screen: "direction",
     eyebrow: "SPRAY CHART",
     lines: ["打った方向ごとの", "打率が見える"],
@@ -84,8 +87,8 @@ const FEATURES: Feature[] = [
     tilt: -9,
   },
   {
-    from: 906,
-    duration: 126,
+    from: 773,
+    duration: 108,
     screen: "pitcher",
     eyebrow: "MATCHUP",
     lines: ["同じ投手との", "通算成績が残る"],
@@ -93,8 +96,8 @@ const FEATURES: Feature[] = [
     tilt: 9,
   },
   {
-    from: 1032,
-    duration: 144,
+    from: 881,
+    duration: 114,
     screen: "ranking",
     eyebrow: "RANKING",
     lines: ["チームの仲間と", "成績で競える"],
@@ -103,7 +106,13 @@ const FEATURES: Feature[] = [
   },
 ];
 
-const MARKS = [LOGO.from, ...FEATURES.map((feature) => feature.from), DUO.from, CTA.from];
+const MARKS = [
+  THESIS.from,
+  LOGO.from,
+  ...FEATURES.map((feature) => feature.from),
+  DUO.from,
+  CTA.from,
+];
 
 /** 冒頭以外は OVERLAP だけ前倒しし、その分だけシーンの尺も伸ばす */
 const staged = ({ from, duration }: Beat) =>
@@ -116,24 +125,27 @@ export const Reel: React.FC = () => {
 
   const kick = MARKS.reduce((strongest, mark) => {
     const distance = Math.abs(frame - mark);
-    return Math.max(strongest, Math.max(0, 1 - distance / 9));
+    return Math.max(strongest, Math.max(0, 1 - distance / 8));
   }, 0);
 
-  const watermark =
-    track(frame, FEATURES[0].from + 10, 20) * (1 - track(frame, CTA.from - 20, 20)) * 0.5;
-
-  const teaser = staged(TEASER);
+  const hook = staged(HOOK);
+  const thesis = staged(THESIS);
   const logo = staged(LOGO);
   const duo = staged(DUO);
   const cta = staged(CTA);
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#0B0906" }}>
+      <Audio src={staticFile("audio/reel.m4a")} />
       <Backdrop />
 
-      <AbsoluteFill style={{ transform: `scale(${1 + kick * 0.014})` }}>
-        <Sequence from={teaser.from} durationInFrames={teaser.span}>
-          <Teaser duration={teaser.span} />
+      <AbsoluteFill style={{ transform: `scale(${1 + kick * 0.018})` }}>
+        <Sequence from={hook.from} durationInFrames={hook.span}>
+          <Hook duration={hook.span} />
+        </Sequence>
+
+        <Sequence from={thesis.from} durationInFrames={thesis.span}>
+          <Thesis duration={thesis.span} />
         </Sequence>
 
         <Sequence from={logo.from} durationInFrames={logo.span}>
@@ -158,8 +170,11 @@ export const Reel: React.FC = () => {
         </Sequence>
       </AbsoluteFill>
 
-      <Watermark opacity={watermark} />
-      <Streaks frame={frame} marks={MARKS} />
+      <Hud
+        opacity={track(frame, THESIS.from + 4, 14) * (1 - track(frame, CTA.from - 14, 14))}
+        progress={frame / TOTAL_FRAMES}
+      />
+      <Transitions frame={frame} marks={MARKS} />
     </AbsoluteFill>
   );
 };

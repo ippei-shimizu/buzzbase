@@ -44,7 +44,7 @@ export const Cta: React.FC = () => {
   const land = spring({
     frame,
     fps,
-    config: { damping: 190, mass: 1.1, stiffness: 80 },
+    config: { damping: 190, mass: 1, stiffness: 104 },
   });
 
   return (

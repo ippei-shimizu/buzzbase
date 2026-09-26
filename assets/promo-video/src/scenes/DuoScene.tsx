@@ -16,11 +16,11 @@ export const DuoScene: React.FC<{ duration: number }> = ({ duration }) => {
     spring({
       frame: frame - delay,
       fps,
-      config: { damping: 200, mass: 1.3, stiffness: 74 },
+      config: { damping: 200, mass: 1, stiffness: 106 },
     });
 
   const back = phone(0);
-  const front = phone(9);
+  const front = phone(7);
 
   return (
     <AbsoluteFill style={{ perspective: 1900, perspectiveOrigin: "50% 48%" }}>

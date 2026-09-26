@@ -50,7 +50,7 @@ export const Headline: React.FC<{
 }> = ({ lines, frame, start, size = 70 }) => (
   <div style={{ perspective: 1200 }}>
     {lines.map((line, index) => {
-      const progress = track(frame, start + index * 7, 26);
+      const progress = track(frame, start + index * 5, 20);
       return (
         <div
           key={line}

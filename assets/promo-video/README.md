@@ -9,8 +9,8 @@ TikTok / Instagram リール / X 向けの縦型（1080x1920）プロモーシ�
 | ---- | ---- |
 | 解像度 | 1080 x 1920（9:16） |
 | フレームレート | 30fps |
-| 尺 | 49秒（1470 フレーム） |
-| 音声 | なし（各 SNS 側で BGM を付ける想定） |
+| 尺 | 42秒（1259 フレーム） |
+| 音声 | AAC。`make_audio.py` で合成したサウンドベッド |
 
 ## コマンド
 
@@ -31,14 +31,17 @@ npx remotion still BuzzBaseReel out/frame.png --frame=700
 | ファイル | 役割 |
 | ---- | ---- |
 | `src/Reel.tsx` | シーンの並びと尺。文言・紹介する機能はここで変える |
-| `src/scenes/FeatureScene.tsx` | 機能紹介シーンの共通レイアウト（見出し＋端末モック） |
-| `src/scenes/Teaser.tsx` | 冒頭。硬式球がカメラに向かって飛んでくる |
+| `src/scenes/Hook.tsx` | 冒頭1.5秒。1フレーム目からゴールドの全面で問いかける |
+| `src/scenes/Thesis.tsx` | 記憶 → 記録 の言い換えでアプリの存在理由を言い切る |
 | `src/scenes/LogoScene.tsx` | ロゴの着地とタグライン |
+| `src/scenes/FeatureScene.tsx` | 機能紹介シーンの共通レイアウト（見出し＋端末モック＋背面マーキー） |
 | `src/scenes/DuoScene.tsx` | 練習記録と野球ノートを2台並べる |
 | `src/scenes/Cta.tsx` | 締めのロゴとダウンロード導線 |
 | `src/components/Backdrop.tsx` | 全編に敷くナイターの球場。視差付きの 3D レイヤー |
 | `src/components/Phone.tsx` | 実画面をはめ込む端末モック |
-| `src/components/Streaks.tsx` | シーン転換の斜めトレイル（ロゴのモチーフ） |
+| `src/components/Transitions.tsx` | シーン転換。全面フラッド / トレイル / スラブの3種を順番に回す |
+| `src/components/Marquee.tsx` | 継ぎ目なくループする横スクロール文字 |
+| `src/components/Hud.tsx` | 上端の常設バーと進捗線 |
 | `src/theme.ts` | 配色とフォント |
 
 ## 素材
@@ -52,6 +55,20 @@ python3 extract_screens.py
 ```
 
 App Store のスクリーンショットを差し替えたら、このスクリプトを流し直す。
+
+## 音
+
+`public/audio/reel.m4a` は `make_audio.py` が numpy で合成する。
+既製曲を使わないので権利処理が要らない代わりに、ドラムループではなく
+ドローン＋カットに同期したインパクトとウーッシュで構成している。
+
+```bash
+python3 make_audio.py
+```
+
+**カットの frame を変えたら `make_audio.py` の `CUTS` と `TOTAL_FRAMES` も合わせる。**
+ずれると効果音が画の切り替わりから外れる。ライセンス済みの楽曲に差し替える場合は
+`public/audio/reel.m4a` を置き換えるだけでよい。
 
 ## 見出しの改行について
 
