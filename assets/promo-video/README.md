@@ -3,23 +3,25 @@
 TikTok / Instagram リール / X 向けの縦型（1080x1920）プロモーション動画を Remotion で書き出す。
 画面収録ではなくコードから MP4 を生成するため、文言や尺を変えたら同じコマンドで作り直せる。
 
-## 2本ある
+## 3本ある
 
 | コンポジション | 出力 | 尺 | 狙い |
 | ---- | ---- | ---- | ---- |
 | `BuzzBaseReel` | `out/buzzbase-reel-vertical.mp4` | 34.7秒 | 機能を順番に見せる王道の紹介。共通レイアウトに実画面を差し替えていく |
 | `BuzzBaseStory` | `out/buzzbase-story-vertical.mp4` | 32.0秒 | 「1打席を思い出せない」から入る物語型。カットごとに地の色も構図も変える |
+| `BuzzBaseJourney` | `out/buzzbase-journey-vertical.mp4` | 40.0秒 | **カットを1回も割らない**ワンカット。1シーズン分のデータの中をカメラが移動し続ける |
 
-どちらも 1080x1920 / 30fps / 音声 AAC。
+いずれも 1080x1920 / 30fps / 音声 AAC。
 
 ## コマンド
 
 ```bash
 npm install
 npm run studio        # ブラウザでプレビュー・スクラブ
-npm run build         # 機能紹介版を書き出す
-npm run build:story   # 物語版を書き出す
-npm run audio         # 2本ぶんの音を作り直す
+npm run build           # 機能紹介版を書き出す
+npm run build:story     # 物語版を書き出す
+npm run build:journey   # ワンカット版を書き出す
+npm run audio           # 3本ぶんの音を作り直す
 ```
 
 特定フレームだけ静止画で確認する場合:
@@ -34,6 +36,9 @@ npx remotion still BuzzBaseReel out/frame.png --frame=700
 | ---- | ---- |
 | `src/Reel.tsx` | 機能紹介版のシーンの並びと尺 |
 | `src/Story.tsx` | 物語版のカット割り。`src/story/` の各カットを並べるだけ |
+| `src/Journey.tsx` | ワンカット版。カメラの寄り引きと進行のキーフレームがすべて |
+| `src/journey/season.ts` | ワンカット版が舞台にする1シーズン分のデータと座標 |
+| `src/journey/World.tsx` | その座標系に描いた折れ線・注釈カード・寄りで見せる小カード |
 | `src/scenes/Hook.tsx` | 冒頭1.5秒。1フレーム目からゴールドの全面で問いかける |
 | `src/scenes/Thesis.tsx` | 記憶 → 記録 の言い換えでアプリの存在理由を言い切る |
 | `src/scenes/LogoScene.tsx` | ロゴの着地とタグライン |
@@ -68,8 +73,8 @@ App Store のスクリーンショットを差し替えたら、このスクリ�
 
 ## 音
 
-`public/audio/reel.m4a` と `public/audio/story.m4a` は `make_audio.py` が numpy で合成する。
-2本ぶんの設定はスクリプト冒頭の `TRACKS` にある。
+`public/audio/*.m4a` は `make_audio.py` が numpy で合成する。
+3本ぶんの設定はスクリプト冒頭の `TRACKS` にある。
 既製曲を使わないので権利処理が要らない。キック / スネア / ハイハット /
 ベース / アルペジオ / パッドを小節単位で積み上げ、カット位置にインパクトを置いている。
 
@@ -81,6 +86,14 @@ python3 make_audio.py
 シーンの尺は 80 フレームの倍数（または 20 フレーム刻み）に保つと拍から外れない。
 ずれると効果音が画の切り替わりから外れる。ライセンス済みの楽曲に差し替える場合は
 `public/audio/reel.m4a` を置き換えるだけでよい。
+
+## ワンカット版の作り
+
+`src/journey/season.ts` が 6800x1920 の「シーズンの座標系」を持ち、`World.tsx` がそこに
+折れ線・月・注釈カードを置く。`Journey.tsx` はその上を動くカメラ（`progress` / `zoom`）の
+キーフレームだけを持つ。**カメラが止まって寄る区間の `progress` は、カードの `ratio` より
+少し先の値にする**。カードの真上で止めると出現条件（`progress > ratio`）を満たさず、
+寄ったのに何も出ないフレームになる。
 
 ## 物語版のつなぎ方
 

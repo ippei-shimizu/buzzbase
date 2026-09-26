@@ -7,6 +7,7 @@
     "studio": "remotion studio",
     "build": "remotion render BuzzBaseReel out/buzzbase-reel-vertical.mp4",
     "build:story": "remotion render BuzzBaseStory out/buzzbase-story-vertical.mp4",
+    "build:journey": "remotion render BuzzBaseJourney out/buzzbase-journey-vertical.mp4",
     "audio": "python3 make_audio.py"
   }
 }
