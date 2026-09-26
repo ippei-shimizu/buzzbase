@@ -45,6 +45,20 @@ buzzbaseリポジトリにissueを作成し、GitHub Projects "BUZZ BASE" に自
 
 ---
 
+### `/implement-issue` — issue 実装 → Draft PR → レビュー依頼
+
+issue の内容が妥当か（実装済みでないか、既存コードと矛盾していないか、対象リポジトリが判別できるか）を先に検証し、問題なければ作業ブランチ作成・実装・検証・コミット・push・**Draft PR** 作成まで実行。続けて `request-claude-review` を呼び出してレビュー依頼と指摘対応まで完了させる（マージはしない）。issue は複数指定でき、作業ツリーが共有されるため逐次処理する。issue の前提が矛盾している場合はその issue をスキップし、最終報告で確認事項として返す。
+
+```
+/implement-issue 340
+/implement-issue 340 341 342
+/implement-issue https://github.com/ippei-shimizu/buzzbase/issues/340
+```
+
+トリガー: 「issue #340 を実装してPRまで出して」
+
+---
+
 ### `/request-claude-review` — @claude コードレビュー依頼＋自動対応
 
 PRの差分を分析し、重点観点を明記した `@claude` メンションのコメントを投稿してGitHub ActionsのClaude Codeレビューを起動。指摘は差分の該当行へのインラインコメントで返る。レビューが返ってくるまで待機し、指摘内容を確認して対応要否を判断したうえで、修正の実装・コミット（指摘1件につき1コミット）・pushまでを自動で行う（マージはしない）。
