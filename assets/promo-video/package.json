@@ -1,0 +1,23 @@
+{
+  "name": "buzzbase-promo-video",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BUZZ BASE の SNS / ストア用プロモーション動画を Remotion で書き出す",
+  "scripts": {
+    "studio": "remotion studio",
+    "build": "remotion render BuzzBaseReel out/buzzbase-reel-vertical.mp4",
+    "still": "remotion still BuzzBaseReel out/poster.png"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.529",
+    "@remotion/google-fonts": "^4.0.529",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "remotion": "^4.0.529"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^5.9.3"
+  }
+}
