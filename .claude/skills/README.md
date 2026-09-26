@@ -86,6 +86,19 @@ PRの差分を分析し、重点観点を明記した `@claude` メンション�
 
 ---
 
+### `/request-claude-review-cloud` — @claude コードレビュー依頼＋自動対応（クラウドセッション版）
+
+`/request-claude-review` を Claude Code on the web（クラウドセッション）で動くように置き換えたもの。`gh` CLI の代わりに GitHub MCP でコメント投稿・返信・resolve を行い、レビューは `gh run watch` で待たず PR を購読してイベントで起こされてから対応する。レビュー観点・依頼本文・指摘の分類基準はローカル版を参照する。PR の head がセッション指定ブランチと異なる場合は、修正を push する前に一度だけ許可を確認する。`/implement-issue-cloud` のレビュー依頼・指摘対応もこのスキルの手順を使う。
+
+```
+/request-claude-review-cloud https://github.com/ippei-shimizu/buzzbase_back/pull/335
+/request-claude-review-cloud 335 N+1とマイグレーションの非可逆性を重点的に
+```
+
+トリガー: クラウドセッションでの「PRにレビュー依頼して」「@claudeでレビューお願いして」
+
+---
+
 ### `/start-worktree` — Git Worktree + 開発環境セットアップ
 
 issue番号からgit worktreeを作成。front/backサブモジュールのworktree作成、ブランチ作成、.envコピー、Docker Compose起動まで一括実行。
