@@ -31,7 +31,7 @@ allowedTools:
 | 作業ブランチ | `checkout-branch` で issue ごとに作成 | **セッションが指定したブランチ**（システムプロンプトの「Git Development Branch Requirements」）を使う |
 | Projects の Status 変更 | `gh api graphql` で自動 | MCP に Projects v2 の API が無いため行わない。最終報告でユーザーに依頼する |
 | back の検証 | `docker compose exec back ...` | コンテナ内で直接 `bundle exec ...`（Docker デーモンは使えない） |
-| レビュー待ち | `gh run watch` でブロック | `subscribe_pr_activity` で PR を購読し、イベントで起こされてから対応する |
+| レビュー依頼・対応 | `request-claude-review` を呼ぶ（`gh run watch` でブロック） | `request-claude-review-cloud` の手順に従う（PR を購読し、イベントで起こされてから対応する） |
 
 ## 絶対ルール
 
@@ -53,7 +53,7 @@ allowedTools:
 GitHub MCP のツールは deferred なので、使う前に `ToolSearch` で読み込む。
 
 ```
-ToolSearch: select:mcp__github__issue_read,mcp__github__search_code,mcp__github__create_pull_request,mcp__github__issue_write,mcp__github__add_issue_comment,mcp__github__pull_request_read,mcp__github__add_reply_to_pull_request_comment,mcp__github__resolve_review_thread,mcp__Claude_Code_Remote__subscribe_pr_activity
+ToolSearch: select:mcp__github__issue_read,mcp__github__search_code,mcp__github__create_pull_request,mcp__github__issue_write,mcp__github__add_issue_comment,mcp__github__pull_request_read,mcp__github__add_reply_to_pull_request_comment,mcp__github__resolve_review_thread,mcp__github__list_pull_requests,mcp__github__actions_list,mcp__github__get_job_logs,mcp__Claude_Code_Remote__subscribe_pr_activity,mcp__Claude_Code_Remote__send_later
 ```
 
 - GitHub MCP が接続エラーで使えない場合は、issue を読めないので**この時点で止め**、ユーザーに「GitHub MCP が接続できていない」ことを伝える。issue 本文を貼ってもらえれば 2 以降を進め、PR 作成以降は push までで止めて報告する
@@ -195,16 +195,9 @@ git -C <path> push -u origin <branch>
 
 ### 10. @claude レビュー依頼
 
-`request-claude-review` スキルは `gh` 前提なので呼ばない。代わりに同スキルの「3. 重点観点の抽出」「4. コメント本文の作成」の方針どおりに本文を組み、`mcp__github__add_issue_comment`（`issue_number`: PR 番号）で投稿する。
+`request-claude-review-cloud` スキルの「フェーズ A」の手順 3〜5（依頼本文の作成・投稿・購読とチェックイン予約）に従う。PR の特定・差分収集・push 先の確認（同スキルの手順 0〜2）は、ここまでの手順で済んでいるので行わない。head はセッション指定ブランチなので、push の許可確認も不要。
 
-- 本文に `@claude` を必ず含める（無いとワークフローが起動しない）
-- 「既存機能への影響・デグレ」「セキュリティ」の2観点は必ず入れ、差分固有の懸念を書き添える
-- 「指摘の投稿方法」セクション（インラインコメント・`confirmed: true`）と「マージはこちらで行う」の一文を必ず入れる
-- 関連 issue は `ippei-shimizu/buzzbase#<NUM>` 形式で参照する
-
-投稿後、`mcp__Claude_Code_Remote__subscribe_pr_activity` で PR を購読する。`mcp__Claude_Code_Remote__send_later` があれば約1時間後のチェックインも予約しておく。
-
-**複数 issue がある場合は、ここで購読だけして次の issue（別リポジトリ）に進む**。レビュー待ちでブロックしない。
+- 同スキルの手順 5 は「ターンを終える」だが、**複数 issue がある場合はここで購読だけして次の issue（別リポジトリ）に進む**。レビュー待ちでブロックしない
 
 ### 11. 次の issue へ
 
@@ -237,21 +230,9 @@ ippei-shimizu/buzzbase#<NUM> <タイトル>
 
 ### 13. レビュー指摘への対応（PR イベントで起こされたとき）
 
-`@claude` のレビューが PR イベントとして届いたら、`request-claude-review` の「9〜12」と同じ基準で対応する。コマンドだけ MCP に置き換える。
+`@claude` のレビューが PR イベント（またはチェックイン）で届いたら、`request-claude-review-cloud` スキルの「フェーズ B」（手順 6〜13）に従って対応する。分類・1指摘1コミット・全スレッドへの返信と resolve・`record-learning` の実行まで同スキルに定義されている。
 
-| 操作 | ツール |
-| ---- | ---- |
-| インラインコメント・スレッド ID の取得 | `mcp__github__pull_request_read`（`method: get_review_comments`） |
-| 全体所感コメントの取得 | `mcp__github__pull_request_read`（`method: get_comments`） |
-| スレッドへの返信 | `mcp__github__add_reply_to_pull_request_comment`（`commentId` はスレッド先頭コメントの数値 ID） |
-| resolve | `mcp__github__resolve_review_thread`（`threadId` は `PRRT_...` の node ID） |
-
-- 指摘ごとに「対応する / 対応しない（既知・意図的）/ 対応しない（誤検知）/ 対応不要（確認事項）」に分類し、判断に迷うものは実コードを読んで裏を取る
-- **指摘1件につき1コミット**。コミットごとに該当リポジトリの検証を回し、push は最後に1回
-- push 後、**すべてのスレッドに返信してから** resolve する。コミットに触れるときは `[<短縮ハッシュ>](https://github.com/<owner>/<repo>/commit/<フルハッシュ>)` でリンクする
-- マージ直前の作業や PR 外のアクションが残るスレッドは resolve しない
-- 修正後に自動で再度 `@claude` レビューを依頼しない
-- 対応を push し終えたら `record-learning` スキルを実行する
+- 複数の PR を購読している場合は、起こしたイベントの PR だけでなく、購読中の全 PR の状態を確認する
 - 指摘が赤丸（ブロッキング）でないのに push を始めない、CI 赤は必ず対応する等、PR 監視時の扱いはセッションのシステムルールに従う
 
 ## コマンド実行制約
