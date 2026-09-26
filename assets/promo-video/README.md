@@ -3,25 +3,31 @@
 TikTok / Instagram リール / X 向けの縦型（1080x1920）プロモーション動画を Remotion で書き出す。
 画面収録ではなくコードから MP4 を生成するため、文言や尺を変えたら同じコマンドで作り直せる。
 
-## 3本ある
+## 6本ある
 
 | コンポジション | 出力 | 尺 | 狙い |
 | ---- | ---- | ---- | ---- |
-| `BuzzBaseReel` | `out/buzzbase-reel-vertical.mp4` | 34.7秒 | 機能を順番に見せる王道の紹介。共通レイアウトに実画面を差し替えていく |
-| `BuzzBaseStory` | `out/buzzbase-story-vertical.mp4` | 32.0秒 | 「1打席を思い出せない」から入る物語型。カットごとに地の色も構図も変える |
-| `BuzzBaseJourney` | `out/buzzbase-journey-vertical.mp4` | 40.0秒 | **カットを1回も割らない**ワンカット。1シーズン分のデータの中をカメラが移動し続ける |
+| `BuzzBaseReel` | `buzzbase-reel-vertical.mp4` | 34.7秒 | 機能を順番に見せる王道の紹介。共通レイアウトに実画面を差し替えていく |
+| `BuzzBaseStory` | `buzzbase-story-vertical.mp4` | 32.0秒 | 「1打席を思い出せない」から入る物語型。カットごとに地の色も構図も変える |
+| `BuzzBaseJourney` | `buzzbase-journey-vertical.mp4` | 40.0秒 | **カットを1回も割らない**ワンカット。1シーズン分のデータの中をカメラが移動し続ける |
+| `BuzzBaseRunway` | `buzzbase-runway-vertical.mp4` | 37.3秒 | エディトリアル。明朝とボドニ、余白と細い罫だけで組んだ静かな一本 |
+| `BuzzBasePop` | `buzzbase-pop-vertical.mp4` | 29.3秒 | ポップ。生成り地に太い黒縁、跳ねるバネと紙吹雪で中高生向けに振る |
+| `BuzzBasePlay` | `buzzbase-play-vertical.mp4` | 34.7秒 | プレーと記録の実演。打球が飛ぶ俯瞰図から、指のタップで記録する所までを続けて見せる |
 
-いずれも 1080x1920 / 30fps / 音声 AAC。
+出力先はすべて `out/`。いずれも 1080x1920 / 30fps / 音声 AAC。
 
 ## コマンド
 
 ```bash
 npm install
 npm run studio        # ブラウザでプレビュー・スクラブ
-npm run build           # 機能紹介版を書き出す
-npm run build:story     # 物語版を書き出す
-npm run build:journey   # ワンカット版を書き出す
-npm run audio           # 3本ぶんの音を作り直す
+npm run build           # 機能紹介版
+npm run build:story     # 物語版
+npm run build:journey   # ワンカット版
+npm run build:runway    # エディトリアル版
+npm run build:pop       # ポップ版
+npm run build:play      # プレー＆記録版
+npm run audio           # 6本ぶんの音を作り直す
 ```
 
 特定フレームだけ静止画で確認する場合:
@@ -39,6 +45,11 @@ npx remotion still BuzzBaseReel out/frame.png --frame=700
 | `src/Journey.tsx` | ワンカット版。カメラの寄り引きと進行のキーフレームがすべて |
 | `src/journey/season.ts` | ワンカット版が舞台にする1シーズン分のデータと座標 |
 | `src/journey/World.tsx` | その座標系に描いた折れ線・注釈カード・寄りで見せる小カード |
+| `src/Runway.tsx` | エディトリアル版。全編クロスフェードで、ハードカットを使わない |
+| `src/Pop.tsx` | ポップ版。跳ねるバネ・ステッカー・紙吹雪の部品もこの1ファイルにある |
+| `src/Play.tsx` | プレー＆記録版のカット割り |
+| `src/play/Field.tsx` | 俯瞰の球場。アプリの球場図と同じ形にして受け渡しに使う |
+| `src/play/TapPhone.tsx` | 実画面の座標（920x2002）でタップを再現する端末 |
 | `src/scenes/Hook.tsx` | 冒頭1.5秒。1フレーム目からゴールドの全面で問いかける |
 | `src/scenes/Thesis.tsx` | 記憶 → 記録 の言い換えでアプリの存在理由を言い切る |
 | `src/scenes/LogoScene.tsx` | ロゴの着地とタグライン |
@@ -74,7 +85,10 @@ App Store のスクリーンショットを差し替えたら、このスクリ�
 ## 音
 
 `public/audio/*.m4a` は `make_audio.py` が numpy で合成する。
-3本ぶんの設定はスクリプト冒頭の `TRACKS` にある。
+6本ぶんの設定はスクリプト冒頭の `TRACKS` にある。
+動画ごとにトーンを変えてあり、`layers` に大きな数（99）を入れるとそのパートは最後まで鳴らない
+（エディトリアル版はこれでスネアとハイハットを外している）。ポップ版は長調の進行に
+`arp_octave: 2` を足して明るくしている。
 既製曲を使わないので権利処理が要らない。キック / スネア / ハイハット /
 ベース / アルペジオ / パッドを小節単位で積み上げ、カット位置にインパクトを置いている。
 
@@ -101,6 +115,12 @@ python3 make_audio.py
 **シーン同士を溶かさずハードカットでつなぐ**。各シーンにフェードアウトを持たせると
 切り替わる直前に一瞬黒が挟まるので、`src/story/` のシーンは抜きのアニメーションを持たない。
 切れ目の演出は `Transitions` のフラッシュとワイプだけが担当する。
+
+## タップの再現について
+
+`TapPhone` は切り出した実画面の座標系（920x2002）でタップ位置を受け取り、
+端末の表示幅から自動で換算する。ボタンの座標は `public/screens/*.png` に
+グリッドを重ねて実測する。画面を撮り直したら座標も取り直すこと。
 
 ## 見出しの改行について
 

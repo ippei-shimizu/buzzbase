@@ -70,6 +70,46 @@ TRACKS = [
         "cta_bar": 13,
         "gain": [0.72, 0.90, 0.94, 0.98, 1.00, 1.04, 1.00, 1.04, 1.06, 1.02, 1.06, 1.08, 1.10, 1.12, 1.04],
     },
+    {
+        "name": "runway",
+        "frames": 1120,
+        "cuts": [0, 958],
+        # 2小節で1コード。和声の動きを遅くするとエディトリアルな落ち着きが出る
+        "progression": [None, "Am", "Am", "F", "F", "C", "C", "G", "G", "Am", "F", "C", "F", "C"],
+        # 99 は「最後まで鳴らさない」の意味。スネアとハイハットを外して静かに保つ
+        "layers": {"kick": 2, "arp": 4, "snare": 99, "hats": 99, "arp16": 99, "ghost": 99, "openhat": 99},
+        "fills": (),
+        "riser_bar": 4,
+        "groove_last_bar": 11,
+        "cta_bar": 12,
+        "gain": [0.58, 0.64, 0.70, 0.76, 0.80, 0.84, 0.88, 0.90, 0.92, 0.94, 0.96, 1.00, 1.02, 0.90],
+    },
+    {
+        "name": "pop",
+        "frames": 880,
+        "cuts": [0, 120, 280, 420, 580, 720],
+        # 長調にしてアルペジオを1オクターブ上げる。それだけで明るく鳴る
+        "progression": ["C", "G", "Am", "F", "C", "G", "Am", "F", "C", "F", "C"],
+        "layers": {"kick": 0, "arp": 0, "snare": 1, "hats": 1, "arp16": 2, "ghost": 3, "openhat": 3},
+        "arp_octave": 2,
+        "fills": (3, 7, 8),
+        "riser_bar": 1,
+        "groove_last_bar": 8,
+        "cta_bar": 9,
+        "gain": [0.95, 1.00, 1.02, 1.05, 1.00, 1.04, 1.06, 1.08, 1.10, 1.12, 1.02],
+    },
+    {
+        "name": "play",
+        "frames": 1040,
+        "cuts": [0, 160, 360, 520, 680, 840],
+        "progression": [None, "Am", "F", "C", "G", "Am", "F", "C", "G", "Am", "F", "F", "C"],
+        "layers": {"kick": 1, "arp": 1, "snare": 2, "hats": 2, "arp16": 3, "ghost": 4, "openhat": 4},
+        "fills": (4, 7, 10),
+        "riser_bar": 2,
+        "groove_last_bar": 10,
+        "cta_bar": 11,
+        "gain": [0.74, 0.88, 0.92, 0.96, 1.00, 1.02, 1.00, 1.04, 1.06, 1.08, 1.10, 1.12, 1.02],
+    },
 ]
 
 rng = np.random.default_rng(1988)
@@ -251,7 +291,7 @@ def render_track(config):
                 for step, index in enumerate(pattern):
                     if not sixteenths and step % 2:
                         continue
-                    tone = chord["tones"][index] * (2 if step % 8 >= 4 else 1)
+                    tone = chord["tones"][index] * (2 if step % 8 >= 4 else 1) * config.get("arp_octave", 1)
                     add(tonal, pluck(tone, 0.32, 0.95 if step % 4 == 0 else 0.6), bar_at + BEAT * step / 4)
 
         # 区切りの前にフィルを入れて、同じ小節の繰り返しに聞こえないようにする

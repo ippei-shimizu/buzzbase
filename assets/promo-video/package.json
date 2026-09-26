@@ -8,6 +8,9 @@
     "build": "remotion render BuzzBaseReel out/buzzbase-reel-vertical.mp4",
     "build:story": "remotion render BuzzBaseStory out/buzzbase-story-vertical.mp4",
     "build:journey": "remotion render BuzzBaseJourney out/buzzbase-journey-vertical.mp4",
+    "build:runway": "remotion render BuzzBaseRunway out/buzzbase-runway-vertical.mp4",
+    "build:pop": "remotion render BuzzBasePop out/buzzbase-pop-vertical.mp4",
+    "build:play": "remotion render BuzzBasePlay out/buzzbase-play-vertical.mp4",
     "audio": "python3 make_audio.py"
   }
 }
