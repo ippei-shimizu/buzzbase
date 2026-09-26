@@ -2,8 +2,9 @@
 
 既製曲を使わずに済ませるため、すべて numpy で生成する。
 映像のカットは 90BPM・1小節 = 80フレームのグリッドに乗せてあるので、
-ここでも同じグリッドでアレンジを組み、カットが必ず小節頭に来るようにしている。
-カットの frame を変えたら CUTS と TOTAL_FRAMES を直して流し直す。
+ここでも同じグリッドでアレンジを組み、カットが必ず拍に来るようにしている。
+
+カットの frame を変えたら TRACKS の cuts と frames を直して流し直す。
 """
 
 import subprocess
@@ -13,18 +14,9 @@ import numpy as np
 
 SAMPLE_RATE = 48000
 FPS = 30
-TOTAL_FRAMES = 1040
 BPM = 90
 BEAT = 60 / BPM
 BAR = BEAT * 4
-BARS = 13
-
-CUTS = [0, 60, 160, 240, 320, 400, 480, 560, 640, 720, 800, 880]
-MONTAGE_BARS = range(3, 10)
-CTA_BAR = 11
-
-DURATION = TOTAL_FRAMES / FPS
-TOTAL_SAMPLES = int(DURATION * SAMPLE_RATE)
 
 CHORDS = {
     "Am": {"bass": 110.00, "tones": [220.00, 261.63, 329.63, 440.00]},
@@ -32,11 +24,39 @@ CHORDS = {
     "C": {"bass": 130.81, "tones": [196.00, 261.63, 329.63, 392.00]},
     "G": {"bass": 98.00, "tones": [196.00, 246.94, 293.66, 392.00]},
 }
-PROGRESSION = [None, None, "Am", "Am", "F", "C", "G", "Am", "F", "C", "G", "F", "C"]
 
 ARP_PATTERNS = [
     [0, 1, 2, 3, 2, 1, 2, 3, 0, 1, 2, 3, 3, 2, 1, 2],
     [3, 2, 1, 0, 1, 2, 3, 2, 3, 2, 1, 0, 0, 1, 2, 3],
+]
+
+TRACKS = [
+    {
+        "name": "reel",
+        "frames": 1040,
+        "cuts": [0, 60, 160, 240, 320, 400, 480, 560, 640, 720, 800, 880],
+        "progression": [None, None, "Am", "Am", "F", "C", "G", "Am", "F", "C", "G", "F", "C"],
+        # パートを足し始める小節。積み上げてモンタージュを盛り上げる
+        "layers": {"kick": 2, "arp": 3, "snare": 5, "hats": 5, "arp16": 6, "ghost": 7, "openhat": 7},
+        "fills": (6, 9, 10),
+        "riser_bar": 3,
+        "groove_last_bar": 10,
+        "cta_bar": 11,
+        "gain": [0.70, 0.52, 0.80, 0.84, 0.88, 0.94, 0.97, 1.00, 1.00, 1.04, 1.09, 1.12, 1.06],
+    },
+    {
+        "name": "story",
+        "frames": 960,
+        "cuts": [0, 60, 140, 200, 260, 320, 400, 480, 560, 640, 720, 800],
+        "progression": [None, "Am", "Am", "F", "C", "G", "Am", "F", "C", "G", "F", "C"],
+        # 1カット目から動く構成なので、こちらは早い小節からフルで鳴らす
+        "layers": {"kick": 1, "arp": 1, "snare": 2, "hats": 2, "arp16": 3, "ghost": 4, "openhat": 4},
+        "fills": (4, 6, 9),
+        "riser_bar": 2,
+        "groove_last_bar": 9,
+        "cta_bar": 10,
+        "gain": [0.76, 0.90, 0.94, 0.98, 1.02, 1.05, 1.00, 1.05, 1.08, 1.12, 1.12, 1.04],
+    },
 ]
 
 rng = np.random.default_rng(1988)
@@ -60,14 +80,6 @@ def lowpass(signal, cutoff):
         state += alpha[index] * (signal[index] - state)
         out[index] = state
     return out
-
-
-def add(buffer, signal, at_seconds):
-    start = int(at_seconds * SAMPLE_RATE)
-    if start >= TOTAL_SAMPLES or start < 0:
-        return
-    end = min(TOTAL_SAMPLES, start + len(signal))
-    buffer[start:end] += signal[: end - start]
 
 
 def kick(strength=1.0):
@@ -102,27 +114,23 @@ def bass(freq, seconds, strength=1.0):
         + 0.34 * np.sin(2 * np.pi * freq * 2 * t)
         + 0.12 * np.sin(2 * np.pi * freq * 3 * t)
     )
-    attack = np.clip(t / 0.006, 0, 1)
-    return wave_form * attack * decay(length, seconds * 0.55) * 0.40 * strength
+    return wave_form * np.clip(t / 0.006, 0, 1) * decay(length, seconds * 0.55) * 0.40 * strength
 
 
 def pluck(freq, seconds, strength=1.0):
     length = int(seconds * SAMPLE_RATE)
     t = times(length)
     wave_form = sum(
-        np.sin(2 * np.pi * freq * harmonic * t) / (harmonic**1.7)
-        for harmonic in (1, 2, 3, 4, 5)
+        np.sin(2 * np.pi * freq * harmonic * t) / (harmonic**1.7) for harmonic in (1, 2, 3, 4, 5)
     )
-    attack = np.clip(t / 0.003, 0, 1)
-    return wave_form * attack * decay(length, 0.13) * 0.30 * strength
+    return wave_form * np.clip(t / 0.003, 0, 1) * decay(length, 0.13) * 0.30 * strength
 
 
 def pad(freqs, seconds, strength=1.0):
     length = int(seconds * SAMPLE_RATE)
     t = times(length)
     voices = sum(
-        np.sin(2 * np.pi * freq * t) + np.sin(2 * np.pi * freq * 1.004 * t)
-        for freq in freqs
+        np.sin(2 * np.pi * freq * t) + np.sin(2 * np.pi * freq * 1.004 * t) for freq in freqs
     )
     swell = np.clip(t / 0.5, 0, 1) * np.clip((seconds - t) / 0.8, 0, 1)
     return voices * swell * 0.055 * strength
@@ -143,163 +151,158 @@ def whoosh(seconds=0.46, strength=1.0):
     length = int(seconds * SAMPLE_RATE)
     t = times(length)
     noise = rng.normal(0, 1, length)
-    cutoff = 380 + 6400 * (t / seconds) ** 2
-    band = lowpass(noise, cutoff) - lowpass(noise, 230)
-    swell = (t / seconds) ** 2.4
+    band = lowpass(noise, 380 + 6400 * (t / seconds) ** 2) - lowpass(noise, 230)
     fall = np.clip(1 - (t - seconds * 0.9) / (seconds * 0.1), 0, 1)
-    return band * swell * fall * strength
+    return band * (t / seconds) ** 2.4 * fall * strength
 
 
 def riser(seconds=1.6, strength=1.0):
     length = int(seconds * SAMPLE_RATE)
     t = times(length)
     noise = rng.normal(0, 1, length)
-    cutoff = 300 + 7200 * (t / seconds) ** 3
-    air = (lowpass(noise, cutoff) - lowpass(noise, 200)) * (t / seconds) ** 2
+    air = (lowpass(noise, 300 + 7200 * (t / seconds) ** 3) - lowpass(noise, 200)) * (t / seconds) ** 2
     glide = 170 * np.exp(3.1 * t / seconds)
     tone = np.sin(2 * np.pi * np.cumsum(glide) / SAMPLE_RATE) * (t / seconds) ** 3
     return (air * 0.85 + tone * 0.26) * strength
 
 
-drums = np.zeros(TOTAL_SAMPLES)
-tonal = np.zeros(TOTAL_SAMPLES)
-effects = np.zeros(TOTAL_SAMPLES)
-kick_times = []
+def render_track(config):
+    global rng
+    rng = np.random.default_rng(1988)
 
-# 小節ごとに鳴らすパートを足していき、モンタージュの中で積み上がるようにする
-LAYERS = {
-    "kick": 2,
-    "arp": 3,
-    "snare": 5,
-    "hats": 5,
-    "arp16": 6,
-    "ghost": 7,
-    "openhat": 7,
-}
-# 小節ごとの音量。前半を抑えて締めに向かって上げる
-SECTION_GAIN = [0.70, 0.52, 0.80, 0.84, 0.88, 0.94, 0.97, 1.00, 1.00, 1.04, 1.09, 1.12, 1.06]
+    duration = config["frames"] / FPS
+    total = int(duration * SAMPLE_RATE)
+    progression = config["progression"]
+    layers = config["layers"]
+    bars = len(progression)
+    groove_last = config["groove_last_bar"]
+    cta_bar = config["cta_bar"]
 
+    drums = np.zeros(total)
+    tonal = np.zeros(total)
+    effects = np.zeros(total)
+    kick_times = []
 
-def playing(part, bar, last_bar):
-    return LAYERS[part] <= bar <= last_bar
+    def add(buffer, signal, at_seconds):
+        start = int(at_seconds * SAMPLE_RATE)
+        if start >= total or start < 0:
+            return
+        end = min(total, start + len(signal))
+        buffer[start:end] += signal[: end - start]
 
+    def playing(part, bar):
+        return layers[part] <= bar <= groove_last
 
-def place_kick(at, strength=1.0):
-    add(drums, kick(strength), at)
-    kick_times.append(at)
+    def place_kick(at, strength=1.0):
+        add(drums, kick(strength), at)
+        kick_times.append(at)
 
+    for bar in range(bars):
+        bar_at = bar * BAR
+        name = progression[bar]
+        chord = CHORDS[name] if name else None
+        in_cta = bar >= cta_bar
 
-GROOVE_LAST_BAR = 10
+        if bar == 0:
+            add(effects, impact(0.8), 0.0)
+            add(tonal, pad([110.0, 164.81], BAR * 2, 0.8), 0.0)
 
-for bar in range(BARS):
-    bar_at = bar * BAR
-    name = PROGRESSION[bar]
-    chord = CHORDS[name] if name else None
-    in_cta = bar >= CTA_BAR
+        # コードが入る前の小節は心拍のようなキックだけ置く
+        if bar > 0 and name is None:
+            place_kick(bar_at + BEAT * 2, 0.7)
 
-    if bar == 0:
-        add(effects, impact(0.8), 0.0)
-        add(tonal, pad([110.0, 164.81], BAR * 2, 0.8), 0.0)
-    if bar == 1:
-        place_kick(bar_at + BEAT * 2, 0.7)
+        if chord and not in_cta:
+            if playing("kick", bar):
+                place_kick(bar_at, 1.0)
+                place_kick(bar_at + BEAT * 2, 0.92)
+            if playing("ghost", bar) and bar % 2 == 1:
+                place_kick(bar_at + BEAT * 2.5, 0.5)
 
-    if chord and not in_cta:
-        if playing("kick", bar, GROOVE_LAST_BAR):
+            add(tonal, bass(chord["bass"], BEAT * 0.9), bar_at)
+            if bar >= layers["arp"]:
+                for offset in (0.5, 1.5, 2.0, 3.0, 3.5):
+                    add(tonal, bass(chord["bass"], BEAT * 0.45, 0.85), bar_at + BEAT * offset)
+
+            if playing("snare", bar):
+                add(drums, snare(1.0), bar_at + BEAT)
+                add(drums, snare(1.0), bar_at + BEAT * 3)
+
+            if playing("hats", bar):
+                for step in range(8):
+                    open_hat = step == 7 and playing("openhat", bar) and bar % 2 == 1
+                    add(drums, hat(1.0 if step % 2 else 0.55, open_hat), bar_at + BEAT * step / 2)
+
+            if playing("arp", bar):
+                sixteenths = playing("arp16", bar)
+                pattern = ARP_PATTERNS[bar % 2]
+                for step, index in enumerate(pattern):
+                    if not sixteenths and step % 2:
+                        continue
+                    tone = chord["tones"][index] * (2 if step % 8 >= 4 else 1)
+                    add(tonal, pluck(tone, 0.32, 0.95 if step % 4 == 0 else 0.6), bar_at + BEAT * step / 4)
+
+        # 区切りの前にフィルを入れて、同じ小節の繰り返しに聞こえないようにする
+        if bar in config["fills"]:
+            for step in range(4):
+                add(drums, snare(0.5 + step * 0.22), bar_at + BEAT * 3 + BEAT * step / 4)
+
+        if in_cta and chord:
             place_kick(bar_at, 1.0)
-            place_kick(bar_at + BEAT * 2, 0.92)
-        if playing("ghost", bar, GROOVE_LAST_BAR) and bar % 2 == 1:
-            place_kick(bar_at + BEAT * 2.5, 0.5)
+            place_kick(bar_at + BEAT * 2, 0.8)
+            add(tonal, pad([chord["bass"], *chord["tones"][:3]], BAR * 1.1, 1.15), bar_at)
+            add(tonal, bass(chord["bass"], BEAT * 1.6), bar_at)
+            for step in (0, 2, 4, 6):
+                add(tonal, pluck(chord["tones"][step % 4] * 2, 0.4, 0.55), bar_at + BEAT * step / 2)
 
-        add(tonal, bass(chord["bass"], BEAT * 0.9), bar_at)
-        if bar >= LAYERS["arp"]:
-            for offset in (0.5, 1.5, 2.0, 3.0, 3.5):
-                add(tonal, bass(chord["bass"], BEAT * 0.45, 0.85), bar_at + BEAT * offset)
+    add(effects, riser(BAR, 0.7), (config["riser_bar"] - 1) * BAR)
+    add(effects, riser(BAR, 0.85), cta_bar * BAR - BAR)
+    add(drums, hat(1.3, open_hat=True), cta_bar * BAR)
+    add(effects, impact(0.5), (bars - 1) * BAR)
 
-        if playing("snare", bar, GROOVE_LAST_BAR):
-            add(drums, snare(1.0), bar_at + BEAT)
-            add(drums, snare(1.0), bar_at + BEAT * 3)
+    payoff_frame = round(cta_bar * BAR * FPS)
+    for index, cut in enumerate(config["cuts"]):
+        at = cut / FPS
+        if index > 0:
+            add(effects, whoosh(0.46, 0.30), max(0.0, at - 0.42))
+        add(effects, impact(0.62 if index < 3 else 0.75 if cut == payoff_frame else 0.34), at)
 
-        if playing("hats", bar, GROOVE_LAST_BAR):
-            for step in range(8):
-                accent = 1.0 if step % 2 else 0.55
-                open_hat = step == 7 and playing("openhat", bar, GROOVE_LAST_BAR) and bar % 2 == 1
-                add(drums, hat(accent, open_hat=open_hat), bar_at + BEAT * step / 2)
+    # キックのたびに音程パートを軽く沈ませて、拍の輪郭を出す
+    duck = np.ones(total)
+    dip_length = int(0.26 * SAMPLE_RATE)
+    dip = 1 - 0.34 * np.exp(-times(dip_length) / 0.07)
+    for at in kick_times:
+        start = int(at * SAMPLE_RATE)
+        end = min(total, start + dip_length)
+        if start < total:
+            duck[start:end] = np.minimum(duck[start:end], dip[: end - start])
 
-        if playing("arp", bar, GROOVE_LAST_BAR):
-            sixteenths = playing("arp16", bar, GROOVE_LAST_BAR)
-            pattern = ARP_PATTERNS[bar % 2]
-            for step, index in enumerate(pattern):
-                if not sixteenths and step % 2:
-                    continue
-                tone = chord["tones"][index]
-                if step % 8 >= 4:
-                    tone *= 2
-                accent = 0.95 if step % 4 == 0 else 0.6
-                add(tonal, pluck(tone, 0.32, accent), bar_at + BEAT * step / 4)
+    section = np.interp(times(total), [bar * BAR for bar in range(bars)], config["gain"])
 
-    # 区切りの前にフィルを入れて、同じ小節の繰り返しに聞こえないようにする
-    if bar in (6, 9, 10):
-        for step in range(4):
-            add(drums, snare(0.5 + step * 0.22), bar_at + BEAT * 3 + BEAT * step / 4)
+    mix = (drums * 1.15 + tonal * duck * 1.2 + effects * 0.8) * section
+    mix *= np.clip((duration - times(total)) / 1.2, 0, 1)
+    mix = np.tanh(mix / max(np.max(np.abs(mix)), 1e-9) * 3.0) * 0.92
 
-    if in_cta and chord:
-        place_kick(bar_at, 1.0)
-        place_kick(bar_at + BEAT * 2, 0.8)
-        add(tonal, pad([chord["bass"], *chord["tones"][:3]], BAR * 1.1, 1.15), bar_at)
-        add(tonal, bass(chord["bass"], BEAT * 1.6), bar_at)
-        for step in (0, 2, 4, 6):
-            add(tonal, pluck(chord["tones"][step % len(chord["tones"])] * 2, 0.4, 0.55), bar_at + BEAT * step / 2)
+    delay = 260
+    delayed = np.concatenate([np.zeros(delay), mix[:-delay]])
+    stereo = np.stack([mix, mix * 0.74 + delayed * 0.26], axis=1)
 
-add(effects, riser(BAR, 0.7), MONTAGE_BARS.start * BAR - BAR)
-add(effects, riser(BAR, 0.85), CTA_BAR * BAR - BAR)
-add(drums, hat(1.3, open_hat=True), CTA_BAR * BAR)
-add(effects, impact(0.5), (BARS - 1) * BAR)
+    wav_path = f"out/{config['name']}.wav"
+    pcm = (np.clip(stereo, -1, 1) * 32767).astype("<i2")
+    with wave.open(wav_path, "wb") as handle:
+        handle.setnchannels(2)
+        handle.setsampwidth(2)
+        handle.setframerate(SAMPLE_RATE)
+        handle.writeframes(pcm.tobytes())
 
-for index, cut in enumerate(CUTS):
-    at = cut / FPS
-    if index > 0:
-        add(effects, whoosh(0.46, 0.30), max(0.0, at - 0.42))
-    is_payoff = cut == CTA_BAR * BAR * FPS
-    add(effects, impact(0.62 if index < 3 else 0.75 if is_payoff else 0.34), at)
+    subprocess.run(
+        # remotion 同梱の ffmpeg は拡張子から m4a を解決できないので -f mp4 を明示する
+        ["npx", "remotion", "ffmpeg", "-i", wav_path, "-c:a", "aac", "-b:a", "160k",
+         "-f", "mp4", "-y", f"public/audio/{config['name']}.m4a"],
+        check=True,
+        capture_output=True,
+    )
+    print(f"public/audio/{config['name']}.m4a ({duration:.2f}s / {bars}小節)")
 
-# キックのたびに音程パートを軽く沈ませて、拍の輪郭を出す
-duck = np.ones(TOTAL_SAMPLES)
-dip_length = int(0.26 * SAMPLE_RATE)
-dip = 1 - 0.34 * np.exp(-times(dip_length) / 0.07)
-for at in kick_times:
-    start = int(at * SAMPLE_RATE)
-    end = min(TOTAL_SAMPLES, start + dip_length)
-    if start < TOTAL_SAMPLES:
-        duck[start:end] = np.minimum(duck[start:end], dip[: end - start])
 
-section = np.interp(
-    times(TOTAL_SAMPLES),
-    [bar * BAR for bar in range(BARS)],
-    SECTION_GAIN,
-)
-
-mix = (drums * 1.15 + tonal * duck * 1.2 + effects * 0.8) * section
-mix *= np.clip((DURATION - times(TOTAL_SAMPLES)) / 1.2, 0, 1)
-
-peak = np.max(np.abs(mix))
-mix = np.tanh(mix / max(peak, 1e-9) * 3.0) * 0.92
-
-delay = 260
-delayed = np.concatenate([np.zeros(delay), mix[:-delay]])
-stereo = np.stack([mix, mix * 0.74 + delayed * 0.26], axis=1)
-
-pcm = (np.clip(stereo, -1, 1) * 32767).astype("<i2")
-with wave.open("out/reel.wav", "wb") as handle:
-    handle.setnchannels(2)
-    handle.setsampwidth(2)
-    handle.setframerate(SAMPLE_RATE)
-    handle.writeframes(pcm.tobytes())
-
-subprocess.run(
-    # remotion 同梱の ffmpeg は拡張子から m4a を解決できないので -f mp4 を明示する
-    ["npx", "remotion", "ffmpeg", "-i", "out/reel.wav", "-c:a", "aac", "-b:a", "160k",
-     "-f", "mp4", "-y", "public/audio/reel.m4a"],
-    check=True,
-    capture_output=True,
-)
-print(f"public/audio/reel.m4a ({DURATION:.2f}s / {BPM}BPM / {BARS}小節)")
+for track in TRACKS:
+    render_track(track)

@@ -24,6 +24,17 @@ export const COLOR = {
   up: "#17C964",
 };
 
+/** 2本目で場面ごとに地の色を変えるためのパレット。ゴールドだけ共通で通す */
+export const SCENE = {
+  cream: "#F2EEE4",
+  creamInk: "#17120A",
+  field: "#14301C",
+  grass: "#2C5C36",
+  board: "#080C11",
+  bulb: "#FFB020",
+  night: "#0B0906",
+};
+
 export const VIDEO = { width: 1080, height: 1920, fps: 30 };
 
 /** 端末モックの画面アスペクト（切り出した実画面 920x2002 に一致させる） */

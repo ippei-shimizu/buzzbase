@@ -3,21 +3,23 @@
 TikTok / Instagram リール / X 向けの縦型（1080x1920）プロモーション動画を Remotion で書き出す。
 画面収録ではなくコードから MP4 を生成するため、文言や尺を変えたら同じコマンドで作り直せる。
 
-## 出力
+## 2本ある
 
-| 項目 | 値 |
-| ---- | ---- |
-| 解像度 | 1080 x 1920（9:16） |
-| フレームレート | 30fps |
-| 尺 | 34.7秒（1040 フレーム） |
-| 音声 | AAC。`make_audio.py` で合成（90BPM / 13小節） |
+| コンポジション | 出力 | 尺 | 狙い |
+| ---- | ---- | ---- | ---- |
+| `BuzzBaseReel` | `out/buzzbase-reel-vertical.mp4` | 34.7秒 | 機能を順番に見せる王道の紹介。共通レイアウトに実画面を差し替えていく |
+| `BuzzBaseStory` | `out/buzzbase-story-vertical.mp4` | 32.0秒 | 「1打席を思い出せない」から入る物語型。カットごとに地の色も構図も変える |
+
+どちらも 1080x1920 / 30fps / 音声 AAC。
 
 ## コマンド
 
 ```bash
 npm install
-npm run studio   # ブラウザでプレビュー・スクラブ
-npm run build    # out/buzzbase-reel-vertical.mp4 を書き出す
+npm run studio        # ブラウザでプレビュー・スクラブ
+npm run build         # 機能紹介版を書き出す
+npm run build:story   # 物語版を書き出す
+npm run audio         # 2本ぶんの音を作り直す
 ```
 
 特定フレームだけ静止画で確認する場合:
@@ -30,7 +32,8 @@ npx remotion still BuzzBaseReel out/frame.png --frame=700
 
 | ファイル | 役割 |
 | ---- | ---- |
-| `src/Reel.tsx` | シーンの並びと尺。文言・紹介する機能はここで変える |
+| `src/Reel.tsx` | 機能紹介版のシーンの並びと尺 |
+| `src/Story.tsx` | 物語版のカット割り。`src/story/` の各カットを並べるだけ |
 | `src/scenes/Hook.tsx` | 冒頭1.5秒。1フレーム目からゴールドの全面で問いかける |
 | `src/scenes/Thesis.tsx` | 記憶 → 記録 の言い換えでアプリの存在理由を言い切る |
 | `src/scenes/LogoScene.tsx` | ロゴの着地とタグライン |
@@ -42,7 +45,8 @@ npx remotion still BuzzBaseReel out/frame.png --frame=700
 | `src/components/Transitions.tsx` | シーン転換。全面フラッド / トレイル / スラブの3種を順番に回す |
 | `src/components/Marquee.tsx` | 継ぎ目なくループする横スクロール文字 |
 | `src/components/Hud.tsx` | 上端の常設バーと進捗線 |
-| `src/theme.ts` | 配色とフォント |
+| `src/story/*.tsx` | 物語版の各カット。1ファイル = 1デザイン |
+| `src/theme.ts` | 配色とフォント。`SCENE` が物語版の場面ごとの地の色 |
 
 ## 素材
 
@@ -58,13 +62,14 @@ App Store のスクリーンショットを差し替えたら、このスクリ�
 
 ## 尺と音の同期
 
-映像のカットは **90BPM・1小節 = 80フレーム** のグリッドに乗せてあり、
-機能紹介は1シーン1小節（2.67秒）で切り替わる。音側も同じグリッドで
-Am - F - C - G のコード進行を組み、小節ごとにパートを足して盛り上げている。
+両方の動画のカットを **90BPM・1小節 = 80フレーム** のグリッドに乗せてある。
+機能紹介版は1シーン1小節（2.67秒）、物語版は 2〜2.67秒で切り替わる。
+音側も同じグリッドで Am - F - C - G のコード進行を組み、小節ごとにパートを足して盛り上げる。
 
 ## 音
 
-`public/audio/reel.m4a` は `make_audio.py` が numpy で合成する。
+`public/audio/reel.m4a` と `public/audio/story.m4a` は `make_audio.py` が numpy で合成する。
+2本ぶんの設定はスクリプト冒頭の `TRACKS` にある。
 既製曲を使わないので権利処理が要らない。キック / スネア / ハイハット /
 ベース / アルペジオ / パッドを小節単位で積み上げ、カット位置にインパクトを置いている。
 
@@ -72,10 +77,17 @@ Am - F - C - G のコード進行を組み、小節ごとにパートを足し�
 python3 make_audio.py
 ```
 
-**カットの frame を変えたら `make_audio.py` の `CUTS` と `TOTAL_FRAMES` も合わせる。**
+**カットの frame を変えたら `TRACKS` の `cuts` と `frames` も合わせる。**
 シーンの尺は 80 フレームの倍数（または 20 フレーム刻み）に保つと拍から外れない。
 ずれると効果音が画の切り替わりから外れる。ライセンス済みの楽曲に差し替える場合は
 `public/audio/reel.m4a` を置き換えるだけでよい。
+
+## 物語版のつなぎ方
+
+物語版はカットごとに地の色（ゴールド / 生成り / グラウンドの緑 / 電光掲示板の紺）が変わるため、
+**シーン同士を溶かさずハードカットでつなぐ**。各シーンにフェードアウトを持たせると
+切り替わる直前に一瞬黒が挟まるので、`src/story/` のシーンは抜きのアニメーションを持たない。
+切れ目の演出は `Transitions` のフラッシュとワイプだけが担当する。
 
 ## 見出しの改行について
 
