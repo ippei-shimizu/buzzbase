@@ -131,6 +131,13 @@ gh api graphql -f query='
 - スキル経由か手動かを問わず、全リポジトリで PR 作成時に `ippei-shimizu` を assignee に設定する
 - `gh` の場合は `gh pr create --assignee ippei-shimizu`。GitHub MCP の `create_pull_request` は assignee を指定できないため、作成直後に `issue_write`（`method: update`, `assignees: ["ippei-shimizu"]`）で設定する
 
+### PR は必ず Draft で作成する
+
+- スキル経由か手動かを問わず、全リポジトリで PR 作成時に `--draft` を付ける。リリース PR を自動生成する `create-release-pr.yml` も Draft で作る
+- CI は Draft をスキップするため、レビュー対応中の無駄な実行が消える
+- Ready for review にした時点で CI が1回走る。Draft PR は GitHub 上でマージできないため、マージ前に必ず1回 CI が通ることが保証される
+- Ready 化とマージはユーザーが行う
+
 ### PR レビュー指摘対応のコミットは指摘ごとに分割する
 
 - 「Fix: PR レビュー指摘に対応 (A / B / C)」のように複数の独立した指摘を1コミットにまとめるのは **禁止**
