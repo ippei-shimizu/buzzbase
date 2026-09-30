@@ -65,6 +65,21 @@ APIのベースパス: `/api/v1/`
 - 上記2のドキュメンテーションコメントは保守性向上の資産。「WHY が自明だから」を理由にレビューで削除しない
 - 消すのは「コードと同じことを言うだけのコメント」「履歴メモ」「issue / PR 番号への参照」「長大な実装解説」
 
+## 実装時の検証（必須）
+
+コード変更を含む作業では、**commit 前に対象リポジトリの検証を必ず実行する**。CI は `stg` → `main` のリリース PR でしか走らないため（mobile は PR で実行）、feature ブランチでの検証はローカル / クラウドが唯一の砦になる。
+
+| リポジトリ | 実行するもの |
+| ---- | ---- |
+| front | `yarn typecheck` / `yarn lint` / `yarn format:check` / `yarn test:ci` |
+| back | `docker compose exec back bundle exec rubocop` / `docker compose exec back bundle exec rspec` |
+| mobile | `yarn typecheck` / `yarn lint` / `yarn format:check`（テストはローカル実行せず CI に任せる） |
+
+- **回せなかった検証を「通った」と書かない**。回せなかったコマンドと理由を報告と PR description に明記し、ユーザーの判断を仰ぐ
+- 個別ファイル単位ではなく、最後の編集が終わったあとにリポジトリ全体で1回回す（後続の編集で個別 lint の結果は無効になる）
+- git hook（front / mobile は lefthook、back は `core.hooksPath` + `.githooks/`）が同じ検証を pre-push で実行する。これはセーフティネットであり、`LEFTHOOK=0` / `--no-verify` でスキップしたまま push しない
+- 各リポジトリの詳細・実測時間・hook のセットアップは `.claude/rules/verification.md` を参照
+
 ## Issue 着手ルール
 
 issue の対応を始めるときは、**実装に手を付ける前に** GitHub Projects "BUZZ BASE"（`ippei-shimizu/projects/2`）の Status を `In Progress` に変更する。確認は不要で即実行する。
