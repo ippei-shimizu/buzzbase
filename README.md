@@ -1,6 +1,6 @@
 # BUZZ BASE  
-サービスURL : https://buzzbase.jp/  
 BUZZ BASE iOS : https://apps.apple.com/jp/app/id6761011816  
+BUZZ BASE Web : https://buzzbase.jp/  
 
 ![](/assets/buzz-ogp.png)
 
