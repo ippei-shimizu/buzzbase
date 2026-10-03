@@ -93,7 +93,8 @@ APIのベースパス: `/api/v1/`
 
 - **回せなかった検証を「通った」と書かない**。回せなかったコマンドと理由を報告と PR description に明記し、ユーザーの判断を仰ぐ
 - 個別ファイル単位ではなく、最後の編集が終わったあとにリポジトリ全体で1回回す（後続の編集で個別 lint の結果は無効になる）
-- git hook（front / mobile は lefthook、back は `core.hooksPath` + `.githooks/`）が同じ検証を pre-push で実行する。これはセーフティネットであり、`LEFTHOOK=0` / `--no-verify` でスキップしたまま push しない
+- git hook（front / mobile は lefthook、back は `core.hooksPath` + `.githooks/`）が同じ検証を pre-push で実行する。これはセーフティネットであり、**ローカルでは** `LEFTHOOK=0` / `--no-verify` でスキップしたまま push しない
+- **クラウドセッションは例外**。環境変数で `LEFTHOOK=0` を設定しており、pre-push は走らない。上の表の検証が唯一の砦になるため、push 前に必ずフルスイートを回す（回せなかった場合は push せずに報告する）
 - 各リポジトリの詳細・実測時間・hook のセットアップは `.claude/rules/verification.md` を参照
 
 ## Issue 着手ルール
