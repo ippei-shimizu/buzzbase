@@ -89,7 +89,7 @@ APIのベースパス: `/api/v1/`
 | ---- | ---- |
 | front | `yarn typecheck` / `yarn lint` / `yarn format:check` / `yarn test:ci` |
 | back | `docker compose exec back bundle exec rubocop` / `docker compose exec back bundle exec rspec` |
-| mobile | `yarn typecheck` / `yarn lint` / `yarn format:check`（テストはローカル実行せず CI に任せる） |
+| mobile | `yarn typecheck` / `yarn lint` / `yarn format:check` / `yarn test:hook` |
 
 - **回せなかった検証を「通った」と書かない**。回せなかったコマンドと理由を報告と PR description に明記し、ユーザーの判断を仰ぐ
 - 個別ファイル単位ではなく、最後の編集が終わったあとにリポジトリ全体で1回回す（後続の編集で個別 lint の結果は無効になる）
