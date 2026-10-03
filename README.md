@@ -1,6 +1,5 @@
 # BUZZ BASE  
 BUZZ BASE iOS : https://apps.apple.com/jp/app/id6761011816  
-BUZZ BASE Web : https://buzzbase.jp/  
 
 ![](/assets/buzzbase-ios-ogp.jpg)
 ![](/assets/buzzbase-ios-ogp-02.jpg)
