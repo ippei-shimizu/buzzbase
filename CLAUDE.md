@@ -118,7 +118,7 @@ hook やガードを自分で書くときは、**「読めなかった」「判�
 
 ### 発火条件
 
-次のいずれかを含む PR では、Draft PR 作成後・Ready 化の前に `/security-review` を実行する。
+次のいずれかを含む PR では、Draft PR を作成した人・エージェントが、`request-claude-review` の前（Ready 化より前）に `/security-review` を実行する。
 
 - 認証 / 認可に触る変更（devise_token_auth、admin の JWT、`proxy.ts`、`before_action` の認証・認可）
 - 課金・サブスクリプションに触る変更（Pro 機能の entitlement 判定、RevenueCat / Stripe（Webhook の受け口を含む）、`api/v1/pro/*`）
