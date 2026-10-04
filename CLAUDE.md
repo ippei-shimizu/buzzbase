@@ -121,7 +121,7 @@ hook やガードを自分で書くときは、**「読めなかった」「判�
 次のいずれかを含む PR では、Draft PR 作成後・Ready 化の前に `/security-review` を実行する。
 
 - 認証 / 認可に触る変更（devise_token_auth、admin の JWT、`proxy.ts`、`before_action` の認証・認可）
-- 課金・サブスクリプションに触る変更（Pro 機能の entitlement 判定、RevenueCat、`api/v1/pro/*`）
+- 課金・サブスクリプションに触る変更（Pro 機能の entitlement 判定、RevenueCat / Stripe（Webhook の受け口を含む）、`api/v1/pro/*`）
 - データの所有権・可視性に触る変更（非公開アカウント、他ユーザーのデータ参照、所有者スコープ）
 - 新規エンドポイントの追加（back の routes に行が増える変更）
 
