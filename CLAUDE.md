@@ -135,8 +135,8 @@ hook やガードを自分で書くときは、**「読めなかった」「判�
 | 担当 | 見るもの | 実行タイミング |
 | ---- | ---- | ---- |
 | Dependabot | 依存ライブラリの既知の脆弱性（CVE）と更新 | 週次（front / back / mobile） |
-| gitleaks | シークレットの混入 | pre-commit と `secret-scan.yml`（front / back は `main` / `stg`、mobile は `main` 向けの PR。Draft を除く） |
-| Brakeman | Rails の静的解析（SQL インジェクション等） | back の `ci.yml`（`stg` → `main` のリリース PR） |
+| gitleaks | シークレットの混入 | pre-commit と `secret-scan.yml`（front / back は `main` / `stg`、mobile は `main` 向けの PR。Draft を除く）。クラウドセッションでは pre-commit は走らない |
+| Brakeman | Rails の静的解析（SQL インジェクション等） | back の `ci.yml`（`stg` → `main` のリリース PR。Draft を除く） |
 | Claude Code（`/security-review`） | 認可漏れ、所有者スコープの欠落、破壊的操作のガード、課金判定の境界 | 上記の発火条件 |
 
 - Claude Code のレビューで、ツールが見る範囲（依存の CVE、シークレット、Brakeman の警告）を重複して扱わない
