@@ -112,6 +112,36 @@ hook やガードを自分で書くときは、**「読めなかった」「判�
 - ガードの判定軸は「今どういう状態か」ではなく「何を変更しようとしているか」にする（pre-push なら手元のブランチ名ではなく push 先の `remote_ref`）
 - 各リポジトリの詳細・実測時間・hook のセットアップは `.claude/rules/verification.md` を参照
 
+## セキュリティレビュー（Claude Code）
+
+パターンマッチで検出できる脆弱性はツールに任せ、Claude Code は認可漏れ・ビジネスロジックの欠陥・設計上の穴を見る。
+
+### 発火条件
+
+次のいずれかを含む PR では、Draft PR を作成した人・エージェントが、`request-claude-review` の前（Ready 化より前）に `/security-review` を実行する。
+
+- 認証 / 認可に触る変更（devise_token_auth、admin の JWT、`proxy.ts`、`before_action` / `skip_before_action` の認証・認可）
+- 課金・サブスクリプションに触る変更（Pro 機能の entitlement 判定、RevenueCat / Stripe（Webhook の受け口を含む）、`api/v1/pro/*`）
+- データの所有権・可視性に触る変更（非公開アカウント、他ユーザーのデータ参照、所有者スコープ）
+- 新規エンドポイントの追加（ルーティングで公開されるアクションが増える変更。既存の `only:` への追加を含む）
+
+加えて、`stg` → `main` のリリース PR では、上記に該当する変更の有無にかかわらず差分全体に対して実行する。front / back は既定ブランチが `stg` のため、比較対象を `origin/main...origin/stg` と明示して依頼し、対象の差分が空なら異常として扱う。
+
+- 実行結果の指摘と対応は PR のコメントに残す。該当しないと判断して実行しなかった場合も、その判断を PR description に書く
+- 観点の詳細は `.claude/rules/review-perspectives.md` の「認証・認可」「データ整合」を参照
+
+### ツールとの分担
+
+| 担当 | 見るもの | 実行タイミング |
+| ---- | ---- | ---- |
+| Dependabot | 依存ライブラリの既知の脆弱性（CVE）と更新 | バージョン更新: 週次（front / back / mobile の `dependabot.yml`）/ 脆弱性アラート: リポジトリ設定に依存 |
+| gitleaks | シークレットの混入 | pre-commit と `secret-scan.yml`（front / back は `main` / `stg`、mobile は `main` 向けの PR。Draft を除く）。クラウドセッションでは pre-commit は走らない |
+| Brakeman | Rails の静的解析（SQL インジェクション等） | back の `ci.yml`（`stg` → `main` のリリース PR。Draft を除く） |
+| Claude Code（`/security-review`） | 認可漏れ、所有者スコープの欠落、破壊的操作のガード、課金判定の境界 | 上記の発火条件 |
+
+- Claude Code のレビューで、ツールが見る範囲（依存の CVE、シークレット、Brakeman の警告）を重複して扱わない
+- **Claude Code のレビューは網羅性・再現性を保証しない**。同じ差分でも実行ごとに指摘が変わりうるため、ツール側の自動検査の代替にしない。ツールを外す・弱める理由に `/security-review` の実行を挙げない
+
 ## Issue 着手ルール
 
 issue の対応を始めるときは、**実装に手を付ける前に** GitHub Projects "BUZZ BASE"（`ippei-shimizu/projects/2`）の Status を `In Progress` に変更する。確認は不要で即実行する。
