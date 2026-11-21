@@ -7,3 +7,9 @@
 [submodule "mobile"]
 	path = mobile
 	url = git@github.com:ippei-shimizu/buzzbase_mobile.git
+[submodule "docs"]
+	path = docs
+	url = git@github.com:ippei-shimizu/buzzbase_docs.git
+[submodule ".claude"]
+	path = .claude
+	url = git@github.com:ippei-shimizu/buzzbase_claude.git

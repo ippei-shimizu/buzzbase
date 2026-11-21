@@ -1,7 +1,3 @@
-# 別の private リポジトリを同じパスに clone している（サブモジュールではない）
-/docs/
-/.claude/
-
 # Dependencies
 package-lock.json
 

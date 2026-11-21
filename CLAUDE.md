@@ -4,19 +4,15 @@
 
 ## プロジェクト構造
 
-- `front/`、`back/`、`mobile/` はgitサブモジュール（別リポジトリ）
+- `front/`、`back/`、`mobile/`、`docs/`、`.claude/` はgitサブモジュール（いずれも private の別リポジトリ）
 - サブモジュール内の変更はサブモジュール側でコミットしてから、ルートでサブモジュール参照を更新する
 - 詳細: @front/CLAUDE.md / @back/CLAUDE.md / @mobile/CLAUDE.md
 
-### `docs/` と `.claude/` はルートの git 管理外
+### `docs/` と `.claude/` の運用
 
-それぞれ別リポジトリを同じパスに clone している（サブモジュールではない）。
-
-- ルートの `.gitignore` で無視しているため、**ルートの `git status` には変更が一切出ない**
-- これらを編集したら、**そのディレクトリ内で** commit / push する（`git -C docs commit` / `git -C .claude commit`）
-- サブモジュールと違い参照を持たないため、ルート側でのコミットは不要
-- 作業完了時に `git -C docs status` / `git -C .claude status` を確認する。これを忘れると変更が放置される
-- 各ディレクトリの `CLAUDE.md` に、書き込み先となるスキル / エージェントの一覧とセットアップ手順がある
+- 編集したら **そのディレクトリ内で** commit / push する（`git -C docs commit` / `git -C .claude commit`）。どちらも `main` へ直接 commit / push してよい
+- そのあとルートで参照を更新して commit / push する（`Fix: サブプロジェクトのコミットIDを更新`）
+- 各ディレクトリの `CLAUDE.md` に、書き込み先となるスキル / エージェントの一覧がある
 
 ## 開発環境
 
