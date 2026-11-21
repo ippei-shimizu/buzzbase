@@ -1,15 +1,20 @@
 [submodule "front"]
 	path = front
 	url = git@github.com:ippei-shimizu/buzzbase_front.git
+	branch = stg
 [submodule "back"]
 	path = back
 	url = git@github.com:ippei-shimizu/buzzbase_back.git
+	branch = stg
 [submodule "mobile"]
 	path = mobile
 	url = git@github.com:ippei-shimizu/buzzbase_mobile.git
+	branch = main
 [submodule "docs"]
 	path = docs
 	url = git@github.com:ippei-shimizu/buzzbase_docs.git
+	branch = main
 [submodule ".claude"]
 	path = .claude
 	url = git@github.com:ippei-shimizu/buzzbase_claude.git
+	branch = main
